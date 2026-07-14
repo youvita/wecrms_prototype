@@ -37,6 +37,8 @@ export function statusClass(status: string): string {
     screening: "bg-blue-100 text-blue-800",
     escalated: "bg-orange-100 text-orange-800",
     reversed: "bg-orange-100 text-orange-800",
+    suspended: "bg-orange-100 text-orange-800",
+    lapsed: "bg-red-100 text-red-800",
     blocked: "bg-red-100 text-red-800",
     breached: "bg-red-100 text-red-800",
     high: "bg-red-100 text-red-800",

@@ -1,4 +1,4 @@
-import type { Customer, LoanApp, Txn, SupportCase, Merchant, CorpBatch } from "./types";
+import type { Customer, LoanApp, Txn, SupportCase, Merchant, CorpBatch, InsurancePolicy } from "./types";
 
 export const CURRENT_USER = {
   name: "Lay Bunnavitou",
@@ -182,4 +182,13 @@ export const ONBOARDING_QUEUE = [
   { name: "Ly Sopheap", when: "Today 10:02", stage: "Screening", result: "Sanctions clear · PEP clear" },
   { name: "Ratha Sim", when: "Today 09:31", stage: "Manual Review", result: "NID photo glare — re-capture requested" },
   { name: "Kanha Prum", when: "Yesterday", stage: "Activated", result: "STP — 4 min end-to-end" },
+];
+
+export const INSURANCE_POLICIES: InsurancePolicy[] = [
+  { id: "POL-24011", customer: "Sok Dara", cif: "CIF-100241", plan: "Life Protect Plus", tier: "Gold Plan", product: "Life", premium: 42, ccy: "USD", termMonths: 36, issueDate: "2024-01-15", renewalDate: "2027-01-15", status: "Active", beneficiary: "Sok Marina (spouse)", officer: "Lay Bunnavitou", branch: "Phnom Penh HQ", renewingSoon: false },
+  { id: "POL-23120", customer: "Chan Sreymom", cif: "CIF-100562", plan: "Micro Health", tier: "Basic Plan", product: "Micro-insurance", premium: 16000, ccy: "KHR", termMonths: 36, issueDate: "2023-12-01", renewalDate: "2026-12-01", status: "Active", beneficiary: "Chan Dara (child)", officer: "Sok Chanthy", branch: "Siem Reap", renewingSoon: true },
+  { id: "POL-22093", customer: "Heng Bunthoeun", cif: "CIF-098455", plan: "Family Health Gold", tier: "Platinum Plan", product: "Health", premium: 120, ccy: "USD", termMonths: 48, issueDate: "2022-09-30", renewalDate: "2026-09-30", status: "Active", beneficiary: "Heng Family Trust", officer: "Lay Bunnavitou", branch: "Phnom Penh HQ", renewingSoon: true },
+  { id: "POL-24055", customer: "Pich Ratana", cif: "CIF-101002", plan: "Motor Shield", tier: "Comprehensive", product: "Motor", premium: 65, ccy: "USD", termMonths: 12, issueDate: "2024-05-10", renewalDate: "2025-05-10", status: "Lapsed", beneficiary: "—", officer: "Meas Sophea", branch: "Battambang", renewingSoon: false },
+  { id: "POL-25007", customer: "Meas Sokha", cif: "CIF-100781", plan: "Travel Secure", tier: "Basic Plan", product: "Travel", premium: 28, ccy: "USD", termMonths: 6, issueDate: "2026-06-20", renewalDate: "2026-12-20", status: "Pending", beneficiary: "Meas Sokha", officer: "Lay Bunnavitou", branch: "Phnom Penh HQ", renewingSoon: false },
+  { id: "POL-25012", customer: "Kim Vireak", cif: "CIF-097330", plan: "Credit Life Cover", tier: "Loan-linked", product: "Credit life", premium: 18, ccy: "USD", termMonths: 24, issueDate: "2026-02-01", renewalDate: "2028-02-01", status: "Suspended", beneficiary: "KB PRASAC Bank", officer: "Lay Bunnavitou", branch: "Phnom Penh HQ", renewingSoon: false },
 ];

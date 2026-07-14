@@ -26,7 +26,7 @@ export default function MerchantsPage() {
       <PageHeader title="Merchants & Corporate" subtitle="Merchant acquiring · corporate cash management"
         actions={
           <button onClick={() => setToast({ message: "Merchant onboarding (KYB) flow would start here", type: "info" })}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700">
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gold text-navy text-sm font-semibold rounded-lg hover:brightness-95">
             <Icon name="add_business" className="text-lg" /><span className="hidden sm:inline">New merchant</span>
           </button>
         } />
@@ -35,7 +35,7 @@ export default function MerchantsPage() {
       <div className="flex gap-1.5">
         {(["Merchants", "Corporate batches"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === t ? "bg-primary-600 text-white shadow" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === t ? "bg-gold text-navy shadow" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
             {t}
           </button>
         ))}
@@ -144,7 +144,7 @@ export default function MerchantsPage() {
                           <button onClick={() => {
                             setBatches(batches.map((x) => (x.id === b.id ? { ...x, status: "Executed" } : x)));
                             setToast({ message: `${b.id} executed — payment advice sent to ${b.client}`, type: "success" });
-                          }} className="px-3 py-1.5 bg-primary-600 text-white text-xs font-semibold rounded-lg hover:bg-primary-700">Execute</button>
+                          }} className="px-3 py-1.5 bg-gold text-navy text-xs font-semibold rounded-lg hover:brightness-95">Execute</button>
                         ) : (
                           <button onClick={() => setToast({ message: `Execution report for ${b.id} downloaded`, type: "success" })}
                             className="text-xs font-semibold text-primary-600 hover:underline">Report</button>

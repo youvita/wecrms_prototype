@@ -33,7 +33,7 @@ export default function LoginPage() {
     if (v && i < 5) refs.current[i + 1]?.focus();
     if (next.every((d) => d !== "")) {
       setLoading(true);
-      setTimeout(() => router.push("/dashboard"), 800);
+      setTimeout(() => router.push("/customers"), 800);
     }
   };
 
@@ -79,7 +79,7 @@ export default function LoginPage() {
                 onKeyDown={(e) => e.key === "Enter" && submitCred()} placeholder="••••••••"
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 mb-6" />
               <button onClick={submitCred} disabled={loading}
-                className={`w-full inline-flex justify-center items-center px-4 py-3 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition-colors ${loading ? "opacity-75 cursor-wait" : ""}`}>
+                className={`w-full inline-flex justify-center items-center px-4 py-3 bg-gold text-navy text-sm font-semibold rounded-lg hover:brightness-95 transition-colors ${loading ? "opacity-75 cursor-wait" : ""}`}>
                 {loading && <Spinner />}
                 {loading ? "Verifying…" : "Continue"}
               </button>

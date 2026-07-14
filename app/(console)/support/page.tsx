@@ -68,7 +68,7 @@ export default function SupportPage() {
           <div className="flex gap-1.5">
             {["All", "Mine", "SLA risk"].map((f) => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${filter === f ? "bg-primary-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
+                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${filter === f ? "bg-gold text-navy" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"}`}>
                 {f}
               </button>
             ))}
@@ -117,7 +117,7 @@ export default function SupportPage() {
           <div className="p-5 space-y-4 max-h-72 overflow-y-auto bg-slate-50/60">
             {sel.thread.map((m, i) => (
               <div key={i} className={`flex ${m.who === "Agent" ? "justify-end" : ""}`}>
-                <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm ${m.who === "Agent" ? "bg-primary-600 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-700 rounded-bl-sm"}`}>
+                <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm ${m.who === "Agent" ? "bg-gold text-navy rounded-br-sm" : "bg-white border border-slate-200 text-slate-700 rounded-bl-sm"}`}>
                   <div className={`text-[10px] font-bold mb-0.5 ${m.who === "Agent" ? "text-primary-200" : "text-slate-400"}`}>{m.who} · {m.when}</div>
                   {m.text}
                 </div>
@@ -143,7 +143,7 @@ export default function SupportPage() {
                 <Icon name="forum" className="text-lg" />Replies go to App Chat · Email · SMS summary
               </div>
               <button onClick={send} disabled={!reply.trim()}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold text-white ${reply.trim() ? "bg-primary-600 hover:bg-primary-700" : "bg-slate-300 cursor-not-allowed"}`}>
+                className={`px-4 py-2 rounded-lg text-sm font-semibold ${reply.trim() ? "bg-gold text-navy hover:brightness-95" : "bg-slate-300 text-slate-500 cursor-not-allowed"}`}>
                 Send reply
               </button>
             </div>

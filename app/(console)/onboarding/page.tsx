@@ -2,8 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ONBOARDING_QUEUE } from "@/lib/data";
-import { AiPanel, Badge, Icon, PageHeader, Toast, type ToastMsg } from "@/components/ui";
+import { AiPanel, Icon, PageHeader, Toast, type ToastMsg } from "@/components/ui";
 
 const STEPS = ["Personal info", "ID document", "Liveness check", "Screening", "Review & activate"];
 
@@ -131,6 +130,11 @@ export default function OnboardingPage() {
 
   return (
     <div className="page-enter max-w-3xl mx-auto">
+      <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
+        <Link href="/customers" className="hover:text-primary-600 font-medium">Customers</Link>
+        <Icon name="chevron_right" className="text-base text-slate-300" />
+        <span className="font-semibold text-slate-800">New customer</span>
+      </div>
       <PageHeader title="Customer Onboarding" subtitle="eKYC — new retail customer" />
 
       {/* Stepper */}
@@ -138,7 +142,7 @@ export default function OnboardingPage() {
         {STEPS.map((s, i) => (
           <React.Fragment key={s}>
             <div className="flex flex-col items-center flex-none">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${i < step || activated ? "bg-green-500 text-white" : i === step ? "bg-primary-600 text-white ring-4 ring-primary-100" : "bg-slate-200 text-slate-500"}`}>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${i < step || activated ? "bg-green-500 text-white" : i === step ? "bg-gold text-navy ring-4 ring-primary-100" : "bg-slate-200 text-slate-500"}`}>
                 {i < step || activated ? <Icon name="check" className="text-lg" /> : i + 1}
               </div>
               <div className={`text-[11px] mt-1.5 text-center w-20 leading-tight ${i === step ? "text-primary-700 font-semibold" : "text-slate-400"}`}>{s}</div>
@@ -245,7 +249,7 @@ export default function OnboardingPage() {
                 {liveState === "done" && <Icon name="verified_user" className="text-6xl text-green-500" />}
               </div>
             </div>
-            {liveState === "idle" && <button onClick={runLiveness} className="px-5 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700">Start liveness check</button>}
+            {liveState === "idle" && <button onClick={runLiveness} className="px-5 py-2.5 bg-gold text-navy text-sm font-semibold rounded-lg hover:brightness-95">Start liveness check</button>}
             {liveState === "checking" && <p className="text-sm font-semibold text-primary-600">Detecting blink · turn head slightly left…</p>}
             {liveState === "done" && (
               <div className="inline-flex items-center gap-4 bg-green-50 border border-green-200 rounded-lg px-5 py-3 text-sm">
@@ -310,7 +314,7 @@ export default function OnboardingPage() {
                 <h2 className="text-xl font-extrabold text-slate-900">Account activated</h2>
                 <p className="text-sm text-slate-500 mt-1 mb-6">CIF-101305 created · Savings KHR account opened · welcome SMS sent</p>
                 <div className="flex justify-center gap-3">
-                  <Link href="/customers" className="px-4 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700">Go to customers</Link>
+                  <Link href="/customers" className="px-4 py-2.5 bg-gold text-navy text-sm font-semibold rounded-lg hover:brightness-95">Go to customers</Link>
                   <button onClick={() => window.location.reload()} className="px-4 py-2.5 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Onboard another</button>
                 </div>
               </div>
@@ -325,25 +329,11 @@ export default function OnboardingPage() {
               Back
             </button>
             <button onClick={next} disabled={!canNext}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold text-white ${canNext ? "bg-primary-600 hover:bg-primary-700" : "bg-slate-300 cursor-not-allowed"}`}>
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold ${canNext ? "bg-gold text-navy hover:brightness-95" : "bg-slate-300 text-slate-500 cursor-not-allowed"}`}>
               {step === 4 ? "Activate account" : "Continue"}
             </button>
           </div>
         )}
-      </div>
-
-      {/* Recent queue */}
-      <div className="mt-6 bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-        <h3 className="font-bold text-slate-900 text-sm mb-3">Recent onboarding activity</h3>
-        <div className="divide-y divide-slate-100">
-          {ONBOARDING_QUEUE.map((o, i) => (
-            <div key={i} className="py-2.5 flex items-center gap-3 text-sm">
-              <Badge label={o.stage} />
-              <div className="flex-1"><span className="font-semibold text-slate-800">{o.name}</span> <span className="text-slate-400 text-xs">· {o.when}</span></div>
-              <span className="text-xs text-slate-500 hidden sm:block">{o.result}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
       {toast && <Toast toast={toast} onClose={() => setToast(null)} />}

@@ -134,3 +134,24 @@ export interface CorpBatch {
   checker: string;
   status: "Awaiting Approval" | "Approved" | "Executed";
 }
+
+export type InsuranceProduct = "Life" | "Health" | "Motor" | "Travel" | "Micro-insurance" | "Credit life";
+
+export interface InsurancePolicy {
+  id: string;
+  customer: string;
+  cif: string;
+  plan: string;
+  tier: string;
+  product: InsuranceProduct;
+  premium: number;
+  ccy: "USD" | "KHR";
+  termMonths: number;
+  issueDate: string;
+  renewalDate: string;
+  status: "Active" | "Pending" | "Suspended" | "Lapsed";
+  beneficiary: string;
+  officer: string;
+  branch: string;
+  renewingSoon: boolean;
+}

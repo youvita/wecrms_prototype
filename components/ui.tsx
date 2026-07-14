@@ -26,7 +26,7 @@ export function EmptyState({ icon = "inbox", message, actionLabel, onAction }: {
       <Icon name={icon} className="text-5xl text-slate-300 block mb-3 empty-bounce mx-auto" />
       <p className="text-slate-500 mb-4">{message}</p>
       {actionLabel && (
-        <button onClick={onAction} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700">
+        <button onClick={onAction} className="px-4 py-2 bg-gold text-navy rounded-lg text-sm font-medium hover:brightness-95">
           {actionLabel}
         </button>
       )}
@@ -75,7 +75,7 @@ export function ConfirmModal({ title, message, confirmLabel = "Confirm", variant
   title: string; message?: string; confirmLabel?: string; variant?: "primary" | "danger";
   onConfirm: () => void; onCancel: () => void; children?: React.ReactNode;
 }) {
-  const btn = variant === "danger" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-primary-600 hover:bg-primary-700 text-white";
+  const btn = variant === "danger" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-gold hover:brightness-95 text-navy";
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 modal-enter" onClick={onCancel}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 modal-enter" onClick={(ev) => ev.stopPropagation()}>
