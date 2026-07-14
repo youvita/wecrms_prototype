@@ -41,26 +41,26 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Brand panel */}
       <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 text-white"
-        style={{ background: "linear-gradient(160deg,#0D1B52 0%,#0043A6 100%)" }}>
+        style={{ background: "linear-gradient(160deg,#201D1A 0%,#3C3833 100%)" }}>
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🏦</span>
+          <span className="w-11 h-11 rounded-xl bg-gold text-navy flex items-center justify-center text-2xl font-black">★</span>
           <div>
             <div className="text-xl font-extrabold">WeCRM365</div>
-            <div className="text-[11px] tracking-widest text-blue-200/80 uppercase">Banking CRMS</div>
+            <div className="text-[11px] tracking-widest text-gold/80 uppercase">KB PRASAC Bank</div>
           </div>
         </div>
         <div>
           <h2 className="text-3xl font-extrabold leading-snug">One console for every<br />customer journey.</h2>
-          <p className="text-blue-100/80 mt-4 max-w-md text-sm leading-relaxed">
+          <p className="text-stone-300/80 mt-4 max-w-md text-sm leading-relaxed">
             Customer 360°, eKYC onboarding, lending pipeline, KHQR payments, support and analytics — built for Cambodian retail banking.
           </p>
           <div className="flex gap-6 mt-8 text-sm">
-            <div><div className="text-2xl font-extrabold">12,847</div><div className="text-blue-200/70">Customers</div></div>
-            <div><div className="text-2xl font-extrabold">1,436</div><div className="text-blue-200/70">Active loans</div></div>
-            <div><div className="text-2xl font-extrabold">8.9k</div><div className="text-blue-200/70">Txns today</div></div>
+            <div><div className="text-2xl font-extrabold text-gold">12,847</div><div className="text-stone-400">Customers</div></div>
+            <div><div className="text-2xl font-extrabold text-gold">1,436</div><div className="text-stone-400">Active loans</div></div>
+            <div><div className="text-2xl font-extrabold text-gold">8.9k</div><div className="text-stone-400">Txns today</div></div>
           </div>
         </div>
-        <p className="text-xs text-blue-200/60">Authorized personnel only · All sessions are monitored and logged</p>
+        <p className="text-xs text-stone-400/70">Authorized personnel only · All sessions are monitored and logged</p>
       </div>
 
       {/* Form panel */}

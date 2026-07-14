@@ -35,14 +35,14 @@ body {
 
 .qr-mock {
   background-image:
-    linear-gradient(90deg, #0D1B52 25%, transparent 25%, transparent 75%, #0D1B52 75%),
-    linear-gradient(#0D1B52 25%, transparent 25%, transparent 75%, #0D1B52 75%);
+    linear-gradient(90deg, #3C3833 25%, transparent 25%, transparent 75%, #3C3833 75%),
+    linear-gradient(#3C3833 25%, transparent 25%, transparent 75%, #3C3833 75%);
   background-size: 14px 14px;
   background-position: 0 0, 7px 7px;
 }
 
 .live-ring { animation: livePulse 1.6s ease-in-out infinite; }
-@keyframes livePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(0,82,204,.35);} 50% { box-shadow: 0 0 0 14px rgba(0,82,204,0);} }
+@keyframes livePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,182,0,.45);} 50% { box-shadow: 0 0 0 14px rgba(255,182,0,0);} }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }

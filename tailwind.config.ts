@@ -5,14 +5,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // KB PRASAC brand — warm charcoal ramp (keeps white-on-primary readable)
         primary: {
-          50: "#EBF3FF", 100: "#D6E6FF", 200: "#ADCCFF", 300: "#7FADFF",
-          400: "#4D88F0", 500: "#1266E3", 600: "#0052CC", 700: "#0043A6",
-          800: "#003580", 900: "#0D1B52",
+          50: "#F6F5F3", 100: "#EBE8E3", 200: "#D8D2C9", 300: "#B8AFA2",
+          400: "#8E8578", 500: "#6B635A", 600: "#4E4841", 700: "#3C3833",
+          800: "#2C2925", 900: "#201D1A",
         },
-        navy: "#0D1B52",
-        goldbg: "#FDF3DC",
-        gold: "#B8860B",
+        navy: "#3C3833",        // KB dark chrome (sidebar, brand panels)
+        goldbg: "#FFF4D4",      // soft KB-yellow tint for accent panels
+        gold: "#FFB600",        // KB Yellow — the signature accent
       },
       fontFamily: {
         sans: ["Inter", "Noto Sans Khmer", "system-ui", "sans-serif"],

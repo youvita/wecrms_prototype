@@ -17,7 +17,7 @@ Sign in with any credentials, then any 6 digits for the OTP (prototype only).
 ## Stack
 
 - Next.js 14 (App Router) · React 18 · TypeScript (strict)
-- Tailwind CSS 3 — design tokens in `tailwind.config.ts` (primary `#0052CC`, navy `#0D1B52`, gold AI accent `#FDF3DC`)
+- Tailwind CSS 3 — KB PRASAC brand tokens in `tailwind.config.ts` (KB Yellow accent `#FFB600`, warm-charcoal chrome `#3C3833`, charcoal `primary` ramp)
 - Fonts: Inter + Noto Sans Khmer (loaded at runtime from Google Fonts), tabular numerals for data
 
 ## Structure

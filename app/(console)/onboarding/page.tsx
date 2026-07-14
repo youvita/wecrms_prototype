@@ -14,12 +14,35 @@ const Spinner = ({ className = "h-5 w-5 text-primary-600" }: { className?: strin
   </svg>
 );
 
-type FormState = { name: string; phone: string; dob: string; nid: string; address: string; err: Record<string, string> };
+type FormState = {
+  name: string; phone: string; dob: string; nid: string; address: string;
+  passportNo: string; nationality: string; issuingCountry: string; passportExpiry: string;
+  err: Record<string, string>;
+};
+
+type DocType = "nid" | "passport";
+
+// Defined at module scope (not inside the page) so the <input> keeps focus and
+// state across re-renders — a nested component would remount on every keystroke.
+function InputField({ label, value, error, onChange, type = "text", placeholder }: {
+  label: string; value: string; error?: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
+      <input type={type} value={value} placeholder={placeholder} onChange={onChange}
+        className={`w-full px-3.5 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${error ? "border-red-300 focus:ring-red-600/20 focus:border-red-600" : "border-slate-300 focus:ring-primary-600/20 focus:border-primary-600"}`} />
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
   const [step, setStep] = React.useState(0);
   const [toast, setToast] = React.useState<ToastMsg>(null);
-  const [form, setForm] = React.useState<FormState>({ name: "", phone: "+855 ", dob: "", nid: "", address: "", err: {} });
+  const [form, setForm] = React.useState<FormState>({ name: "", phone: "+855 ", dob: "", nid: "", address: "", passportNo: "", nationality: "", issuingCountry: "", passportExpiry: "", err: {} });
+  const [docType, setDocType] = React.useState<DocType>("nid");
   const [docState, setDocState] = React.useState<"idle" | "scanning" | "done">("idle");
   const [liveState, setLiveState] = React.useState<"idle" | "checking" | "done">("idle");
   const [screens, setScreens] = React.useState([
@@ -30,23 +53,53 @@ export default function OnboardingPage() {
   ]);
   const [activated, setActivated] = React.useState(false);
 
-  const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+  const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value, err: { ...f.err, [k]: "" } }));
 
   const validateStep0 = () => {
     const err: Record<string, string> = {};
     if (!form.name) err.name = "Full name is required";
     if (form.phone.replace(/\D/g, "").length < 9) err.phone = "Enter a valid Cambodian phone number";
     if (!form.dob) err.dob = "Date of birth is required";
-    setForm({ ...form, err });
+    setForm((f) => ({ ...f, err }));
     return Object.keys(err).length === 0;
+  };
+
+  const validateStep1 = () => {
+    if (docType !== "passport") return true;
+    const err: Record<string, string> = {};
+    if (!form.passportNo) err.passportNo = "Passport number is required";
+    if (!form.nationality) err.nationality = "Nationality is required";
+    if (!form.issuingCountry) err.issuingCountry = "Issuing country is required";
+    if (!form.passportExpiry) err.passportExpiry = "Passport expiry date is required";
+    setForm((f) => ({ ...f, err }));
+    return Object.keys(err).length === 0;
+  };
+
+  const pickDocType = (t: DocType) => {
+    setDocType(t);
+    setDocState("idle");
+    setForm((f) => ({ ...f, err: {} }));
   };
 
   const scanDoc = () => {
     setDocState("scanning");
     setTimeout(() => {
       setDocState("done");
-      setForm((f) => ({ ...f, nid: "010 234 567", address: f.address || "St. 271, Toul Kork, Phnom Penh" }));
-      setToast({ message: "OCR complete — fields extracted from NID", type: "success" });
+      if (docType === "passport") {
+        setForm((f) => ({
+          ...f,
+          passportNo: f.passportNo || "N1234567",
+          nationality: f.nationality || "Cambodian",
+          issuingCountry: f.issuingCountry || "Cambodia",
+          passportExpiry: f.passportExpiry || "2030-08-15",
+          address: f.address || "St. 271, Toul Kork, Phnom Penh",
+        }));
+        setToast({ message: "OCR + MRZ complete — passport fields extracted", type: "success" });
+      } else {
+        setForm((f) => ({ ...f, nid: "010 234 567", address: f.address || "St. 271, Toul Kork, Phnom Penh" }));
+        setToast({ message: "OCR complete — fields extracted from NID", type: "success" });
+      }
     }, 1600);
   };
 
@@ -71,18 +124,10 @@ export default function OnboardingPage() {
 
   const next = () => {
     if (step === 0 && !validateStep0()) return;
+    if (step === 1 && !validateStep1()) return;
     if (step < 4) setStep(step + 1);
     else { setActivated(true); setToast({ message: "Account activated — welcome kit sent", type: "success" }); }
   };
-
-  const InputField = ({ label, k, type, placeholder }: { label: string; k: keyof FormState; type?: string; placeholder?: string }) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
-      <input type={type || "text"} value={form[k] as string} placeholder={placeholder} onChange={set(k)}
-        className={`w-full px-3.5 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${form.err[k as string] ? "border-red-300 focus:ring-red-600/20 focus:border-red-600" : "border-slate-300 focus:ring-primary-600/20 focus:border-primary-600"}`} />
-      {form.err[k as string] && <p className="mt-1 text-sm text-red-600">{form.err[k as string]}</p>}
-    </div>
-  );
 
   return (
     <div className="page-enter max-w-3xl mx-auto">
@@ -108,10 +153,10 @@ export default function OnboardingPage() {
           <div className="space-y-4 page-enter">
             <h2 className="text-lg font-bold text-slate-900">Personal information</h2>
             <div className="grid sm:grid-cols-2 gap-4">
-              <InputField label="Full name (as on NID)" k="name" placeholder="e.g. Sok Dara" />
-              <InputField label="Mobile number" k="phone" placeholder="+855 12 345 678" />
-              <InputField label="Date of birth" k="dob" type="date" />
-              <InputField label="Current address" k="address" placeholder="Street, Sangkat, City" />
+              <InputField label="Full name (as on NID)" value={form.name} error={form.err.name} onChange={set("name")} placeholder="e.g. Sok Dara" />
+              <InputField label="Mobile number" value={form.phone} error={form.err.phone} onChange={set("phone")} placeholder="+855 12 345 678" />
+              <InputField label="Date of birth" value={form.dob} error={form.err.dob} onChange={set("dob")} type="date" />
+              <InputField label="Current address" value={form.address} error={form.err.address} onChange={set("address")} placeholder="Street, Sangkat, City" />
             </div>
             <div className="flex items-start gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
               <Icon name="info" className="text-primary-600 text-lg" />
@@ -122,20 +167,41 @@ export default function OnboardingPage() {
 
         {step === 1 && (
           <div className="page-enter">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">National ID capture</h2>
-            <p className="text-sm text-slate-500 mb-5">Capture both sides — OCR extracts the fields automatically.</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Identity document capture</h2>
+            <p className="text-sm text-slate-500 mb-5">Choose the document type, then capture it — OCR extracts the fields automatically.</p>
+
+            {/* Document type selector */}
+            <div className="grid sm:grid-cols-2 gap-3 mb-5">
+              {([
+                { k: "nid", label: "National ID (NID)", hint: "Cambodian residents", icon: "badge" },
+                { k: "passport", label: "Passport", hint: "Foreign / non-resident", icon: "book_2" },
+              ] as const).map((d) => (
+                <button key={d.k} onClick={() => pickDocType(d.k)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors ${docType === d.k ? "border-primary-600 bg-primary-50 ring-1 ring-primary-600" : "border-slate-300 hover:bg-slate-50"}`}>
+                  <Icon name={d.icon} className={`text-2xl ${docType === d.k ? "text-primary-700" : "text-slate-400"}`} />
+                  <div>
+                    <div className={`text-sm font-semibold ${docType === d.k ? "text-primary-700" : "text-slate-700"}`}>{d.label}</div>
+                    <div className="text-xs text-slate-400">{d.hint}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
             <div className="grid sm:grid-cols-2 gap-4 mb-5">
               <div onClick={docState === "idle" ? scanDoc : undefined}
                 className={`h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors ${docState === "done" ? "border-green-400 bg-green-50" : "border-slate-300 hover:border-primary-400 cursor-pointer bg-slate-50"}`}>
-                {docState === "idle" && (<><Icon name="photo_camera" className="text-4xl text-slate-400" /><span className="text-sm font-semibold text-slate-600">Capture NID — front</span><span className="text-xs text-slate-400">Click to simulate camera</span></>)}
+                {docState === "idle" && (<><Icon name="photo_camera" className="text-4xl text-slate-400" /><span className="text-sm font-semibold text-slate-600">{docType === "passport" ? "Capture passport — bio page" : "Capture NID — front"}</span><span className="text-xs text-slate-400">Click to simulate camera</span></>)}
                 {docState === "scanning" && (<><Spinner className="h-8 w-8 text-primary-600" /><span className="text-sm font-semibold text-primary-600">Scanning &amp; running OCR…</span></>)}
-                {docState === "done" && (<><Icon name="task_alt" className="text-4xl text-green-500" /><span className="text-sm font-semibold text-green-700">Front captured · OCR OK</span></>)}
+                {docState === "done" && (<><Icon name="task_alt" className="text-4xl text-green-500" /><span className="text-sm font-semibold text-green-700">{docType === "passport" ? "Bio page captured · OCR OK" : "Front captured · OCR OK"}</span></>)}
               </div>
               <div className={`h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 ${docState === "done" ? "border-green-400 bg-green-50" : "border-slate-200 bg-slate-50"}`}>
-                {docState === "done" ? (<><Icon name="task_alt" className="text-4xl text-green-500" /><span className="text-sm font-semibold text-green-700">Back captured</span></>) : (<><Icon name="badge" className="text-4xl text-slate-300" /><span className="text-sm text-slate-400">NID — back</span></>)}
+                {docState === "done"
+                  ? (<><Icon name="task_alt" className="text-4xl text-green-500" /><span className="text-sm font-semibold text-green-700">{docType === "passport" ? "MRZ verified" : "Back captured"}</span></>)
+                  : (<><Icon name="badge" className="text-4xl text-slate-300" /><span className="text-sm text-slate-400">{docType === "passport" ? "Passport — MRZ zone" : "NID — back"}</span></>)}
               </div>
             </div>
-            {docState === "done" && (
+
+            {docState === "done" && docType === "nid" && (
               <AiPanel title="Extracted by OCR — confirm with customer">
                 <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
                   <div>NID number: <b className="text-slate-800">{form.nid}</b></div>
@@ -144,6 +210,26 @@ export default function OnboardingPage() {
                   <div>Expiry: <b className="text-slate-800">2031-04-20</b></div>
                 </div>
               </AiPanel>
+            )}
+
+            {docState === "done" && docType === "passport" && (
+              <>
+                <AiPanel title="Extracted by OCR / MRZ — confirm with customer">
+                  <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+                    <div>Name: <b className="text-slate-800">{form.name || "SOK DARA"}</b></div>
+                    <div>DOB: <b className="text-slate-800">{form.dob || "1988-06-12"}</b></div>
+                    <div>Machine-readable zone: <b className="text-slate-800">Verified</b></div>
+                    <div>Document type: <b className="text-slate-800">Passport (P)</b></div>
+                  </div>
+                </AiPanel>
+                <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                  <InputField label="Passport number" value={form.passportNo} error={form.err.passportNo} onChange={set("passportNo")} placeholder="e.g. N1234567" />
+                  <InputField label="Nationality" value={form.nationality} error={form.err.nationality} onChange={set("nationality")} placeholder="e.g. Cambodian" />
+                  <InputField label="Issuing country" value={form.issuingCountry} error={form.err.issuingCountry} onChange={set("issuingCountry")} placeholder="e.g. Cambodia" />
+                  <InputField label="Passport expiry date" value={form.passportExpiry} error={form.err.passportExpiry} onChange={set("passportExpiry")} type="date" />
+                </div>
+                <p className="mt-2 text-xs text-slate-400">Passport onboarding requires these additional fields for foreign / non-resident customers.</p>
+              </>
             )}
           </div>
         )}
@@ -196,7 +282,18 @@ export default function OnboardingPage() {
               <>
                 <h2 className="text-lg font-bold text-slate-900 mb-4">Review &amp; activate</h2>
                 <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm mb-5">
-                  {[["Full name", form.name || "Sok Dara"], ["Phone", form.phone], ["Date of birth", form.dob || "1988-06-12"], ["NID", form.nid], ["Address", form.address], ["Risk rating", "Low (auto)"], ["Product", "Savings — KHR"], ["Branch", "Phnom Penh HQ"]].map(([k, v]) => (
+                  {[
+                    ["Full name", form.name || "Sok Dara"],
+                    ["Phone", form.phone],
+                    ["Date of birth", form.dob || "1988-06-12"],
+                    ...(docType === "passport"
+                      ? [["Document", "Passport"], ["Passport no.", form.passportNo], ["Nationality", form.nationality], ["Issuing country", form.issuingCountry], ["Passport expiry", form.passportExpiry]]
+                      : [["Document", "National ID"], ["NID", form.nid]]),
+                    ["Address", form.address],
+                    ["Risk rating", "Low (auto)"],
+                    ["Product", "Savings — KHR"],
+                    ["Branch", "Phnom Penh HQ"],
+                  ].map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-2">
                       <span className="text-slate-500">{k}</span><span className="font-semibold text-slate-800 text-right">{v}</span>
                     </div>

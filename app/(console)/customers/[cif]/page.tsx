@@ -72,7 +72,7 @@ export default function Customer360Page() {
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
             <div className="flex flex-col items-center text-center">
               <div className="w-20 h-20 rounded-full text-white flex items-center justify-center text-3xl font-extrabold"
-                style={{ background: "linear-gradient(135deg,#0052CC,#0D1B52)" }}>
+                style={{ background: "linear-gradient(135deg,#4E4841,#201D1A)" }}>
                 {getInitial(customer.name)}
               </div>
               <h2 className="text-lg font-extrabold text-slate-900 mt-3 leading-tight">{customer.name}</h2>
@@ -290,7 +290,7 @@ export default function Customer360Page() {
                 {cards.map((card) => (
                   <div key={card.no} className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
                     <div className="rounded-xl p-5 text-white mb-4"
-                      style={{ background: card.status === "Blocked" ? "linear-gradient(135deg,#64748B,#334155)" : "linear-gradient(135deg,#0052CC,#0D1B52)" }}>
+                      style={{ background: card.status === "Blocked" ? "linear-gradient(135deg,#64748B,#334155)" : "linear-gradient(135deg,#3C3833,#201D1A)" }}>
                       <div className="flex justify-between items-start">
                         <span className="text-xs tracking-widest opacity-80 uppercase">{card.type}</span>
                         <Icon name="contactless" />
