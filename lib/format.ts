@@ -11,6 +11,14 @@ export function getInitial(name: string): string {
   return name ? name.charAt(0).toUpperCase() : "?";
 }
 
+// Plain-language labels for the customer wealth/business segment.
+// The underlying value (Mass/Affluent/SME) is kept for core-banking mapping;
+// only the displayed label is friendlier.
+export function segmentLabel(segment: string): string {
+  const map: Record<string, string> = { Mass: "Standard", Affluent: "Priority", SME: "Business" };
+  return map[segment] ?? segment;
+}
+
 export function statusClass(status: string): string {
   const map: Record<string, string> = {
     active: "bg-green-100 text-green-800",

@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { CUSTOMERS } from "@/lib/data";
-import { getInitial } from "@/lib/format";
+import { getInitial, segmentLabel } from "@/lib/format";
 import { Badge, EmptyState, Icon, PageHeader } from "@/components/ui";
 import Link from "next/link";
 
@@ -14,6 +14,7 @@ function segmentClass(s: string) {
 export default function CustomersPage() {
   const router = useRouter();
   const [q, setQ] = React.useState("");
+  const [type, setType] = React.useState("All");
   const [segment, setSegment] = React.useState("All");
   const [kyc, setKyc] = React.useState("All");
   const [perPage, setPerPage] = React.useState(10);
@@ -21,9 +22,10 @@ export default function CustomersPage() {
 
   const rows = CUSTOMERS.filter((c) => {
     const matchQ = !q || (c.name + c.khmerName + c.id + c.phone).toLowerCase().includes(q.toLowerCase());
+    const matchT = type === "All" || (c.profiles ?? [c.customerType]).includes(type as "Individual" | "Corporate");
     const matchS = segment === "All" || c.segment === segment;
     const matchK = kyc === "All" || c.kyc === kyc;
-    return matchQ && matchS && matchK;
+    return matchQ && matchT && matchS && matchK;
   });
 
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage));
@@ -34,6 +36,8 @@ export default function CustomersPage() {
   // Portfolio big-picture (computed from the book).
   const total = CUSTOMERS.length;
   const segments = (["Affluent", "SME", "Mass"] as const).map((s) => ({ s, n: CUSTOMERS.filter((c) => c.segment === s).length }));
+  const indivCount = CUSTOMERS.filter((c) => (c.profiles ?? [c.customerType]).includes("Individual")).length;
+  const corpCount = CUSTOMERS.filter((c) => (c.profiles ?? [c.customerType]).includes("Corporate")).length;
   const adopt = [
     { label: "Savings", n: CUSTOMERS.filter((c) => c.accounts.some((a) => a.type.startsWith("Savings"))).length },
     { label: "Cards", n: CUSTOMERS.filter((c) => c.cards.length > 0).length },
@@ -61,8 +65,10 @@ export default function CustomersPage() {
               <div className="text-xs text-slate-400 mt-1">customers</div>
             </div>
             <div className="flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"><Icon name="person" className="text-sm" />Individual {indivCount}</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800"><Icon name="corporate_fare" className="text-sm" />Corporate {corpCount}</span>
               {segments.map((s) => (
-                <span key={s.s} className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${segmentClass(s.s)}`}>{s.s} {s.n}</span>
+                <span key={s.s} className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${segmentClass(s.s)}`}>{segmentLabel(s.s)} {s.n}</span>
               ))}
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700"><Icon name="lightbulb" className="text-sm" />{crossSell} cross-sell</span>
             </div>
@@ -88,9 +94,13 @@ export default function CustomersPage() {
           <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by name (Latin or Khmer), CIF or phone…"
             className="w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
         </div>
+        <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}
+          className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+          {["All", "Individual", "Corporate"].map((s) => <option key={s}>{s === "All" ? "All types" : s}</option>)}
+        </select>
         <select value={segment} onChange={(e) => { setSegment(e.target.value); setPage(1); }}
           className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
-          {["All", "Mass", "Affluent", "SME"].map((s) => <option key={s}>{s}</option>)}
+          {["All", "Mass", "Affluent", "SME"].map((s) => <option key={s} value={s}>{s === "All" ? "All segments" : segmentLabel(s)}</option>)}
         </select>
         <select value={kyc} onChange={(e) => { setKyc(e.target.value); setPage(1); }}
           className="px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
@@ -102,13 +112,14 @@ export default function CustomersPage() {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         {rows.length === 0 ? (
           <EmptyState icon="person_search" message={`No customers match "${q}"`} actionLabel="Clear search"
-            onAction={() => { setQ(""); setSegment("All"); setKyc("All"); }} />
+            onAction={() => { setQ(""); setType("All"); setSegment("All"); setKyc("All"); }} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Customer</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Type</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Phone</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Segment</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600">KYC</th>
@@ -124,8 +135,8 @@ export default function CustomersPage() {
                     className="hover:bg-primary-50/40 transition-colors cursor-pointer stagger-item" style={{ animationDelay: `${i * 40}ms` }}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold flex-none">
-                          {getInitial(c.name)}
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-none ${c.customerType === "Corporate" ? "bg-primary-700 text-white" : "bg-primary-100 text-primary-700"}`}>
+                          {c.customerType === "Corporate" ? <Icon name="corporate_fare" className="text-lg" /> : getInitial(c.name)}
                         </div>
                         <div>
                           <div className="font-semibold text-slate-800">{c.name} <span className="font-khmer text-slate-400 font-normal">{c.khmerName}</span></div>
@@ -133,9 +144,24 @@ export default function CustomersPage() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      {(() => {
+                        const profs = c.profiles ?? [c.customerType];
+                        const both = profs.includes("Individual") && profs.includes("Corporate");
+                        return both ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gold/20 text-primary-800">
+                            <Icon name="groups" className="text-sm" />Individual + Corporate
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${c.customerType === "Corporate" ? "bg-primary-100 text-primary-800" : "bg-slate-100 text-slate-600"}`}>
+                            <Icon name={c.customerType === "Corporate" ? "corporate_fare" : "person"} className="text-sm" />{c.customerType}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.phone}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${segmentClass(c.segment)}`}>{c.segment}</span>
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${segmentClass(c.segment)}`}>{segmentLabel(c.segment)}</span>
                     </td>
                     <td className="px-4 py-3"><Badge label={c.kyc} /></td>
                     <td className="px-4 py-3 hidden sm:table-cell"><Badge label={c.risk} /></td>

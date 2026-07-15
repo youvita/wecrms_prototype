@@ -15,7 +15,7 @@ export const KPIS = {
 
 export const CUSTOMERS: Customer[] = [
   {
-    id: "CIF-100241", name: "Sok Dara", khmerName: "សុខ ដារ៉ា", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
+    id: "CIF-100241", customerType: "Individual", name: "Sok Dara", khmerName: "សុខ ដារ៉ា", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
     phone: "+855 12 456 789", email: "sok.dara@gmail.com", dob: "1988-06-12", address: "St. 271, Toul Kork, Phnom Penh",
     idType: "National ID", idNo: "010 234 567", idExpiry: "2031-04-20",
     occupation: "Business owner", company: "Dara Trading Co.", incomeUSD: 4200,
@@ -47,7 +47,7 @@ export const CUSTOMERS: Customer[] = [
     ],
   },
   {
-    id: "CIF-100562", name: "Chan Sreymom", khmerName: "ចាន់ ស្រីមុំ", gender: "Female", marital: "Single", nationality: "Cambodia (KH)",
+    id: "CIF-100562", customerType: "Individual", name: "Chan Sreymom", khmerName: "ចាន់ ស្រីមុំ", gender: "Female", marital: "Single", nationality: "Cambodia (KH)",
     phone: "+855 96 234 118", email: "sreymom.chan@yahoo.com", dob: "1995-11-30", address: "St. 315, Boeung Kak, Phnom Penh",
     idType: "National ID", idNo: "021 887 340", idExpiry: "2029-09-02",
     occupation: "Accountant", company: "Ang & Partners", incomeUSD: 850,
@@ -61,10 +61,18 @@ export const CUSTOMERS: Customer[] = [
     interactions: [{ date: "2026-07-08", channel: "App Chat", note: "Set up goal saving: wedding fund ៛12M target" }],
   },
   {
-    id: "CIF-099873", name: "Kim Vireak", khmerName: "គឹម វីរៈ", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
+    id: "CIF-099873", customerType: "Individual", name: "Kim Vireak", khmerName: "គឹម វីរៈ", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
     phone: "+855 78 990 456", email: "vireak@vkcoffee.com.kh", dob: "1983-02-08", address: "NR1, Chbar Ampov, Phnom Penh",
     idType: "National ID", idNo: "008 456 112", idExpiry: "2026-08-15",
     occupation: "CEO", company: "VK Coffee Co., Ltd.", incomeUSD: 6800,
+    profiles: ["Individual", "Corporate"],
+    corporate: {
+      name: "VK Coffee Co., Ltd.", khmerName: "វីខេ ខហ្វី", businessNature: "Coffee retail & F&B",
+      nationality: "Cambodia (KH)", incorporationDate: "2018-03-05",
+      idType: "Business Registration", registrationNo: "00098431 (MoC)", idExpiry: "2028-03-04",
+      phone: "+855 23 900 118", email: "finance@vkcoffee.com.kh", address: "NR1, Chbar Ampov, Phnom Penh",
+      contactPerson: "Kim Vireak · CEO", incomeUSD: 480000,
+    },
     segment: "SME", kyc: "Review due", risk: "Medium", ecdd: "Y", branch: "Chbar Ampov", joined: "2021-01-19",
     ebanking: ["Mobile Banking", "smartBiz", "Debit Card"],
     accounts: [
@@ -81,7 +89,7 @@ export const CUSTOMERS: Customer[] = [
     ],
   },
   {
-    id: "CIF-101204", name: "Ly Sopheap", khmerName: "លី សុភាព", gender: "Female", marital: "Single", nationality: "Cambodia (KH)",
+    id: "CIF-101204", customerType: "Individual", name: "Ly Sopheap", khmerName: "លី សុភាព", gender: "Female", marital: "Single", nationality: "Cambodia (KH)",
     phone: "+855 11 782 340", email: "ly.sopheap88@gmail.com", dob: "1999-04-22", address: "Wat Bo Village, Siem Reap",
     idType: "National ID", idNo: "034 220 990", idExpiry: "2033-01-11",
     occupation: "Tour guide", company: "Freelance", incomeUSD: 420,
@@ -93,7 +101,7 @@ export const CUSTOMERS: Customer[] = [
     interactions: [{ date: "2026-07-09", channel: "App", note: "Self-onboarded via eKYC — liveness passed, NID verified" }],
   },
   {
-    id: "CIF-098455", name: "Heng Bunthoeun", khmerName: "ហេង ប៊ុនធឿន", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
+    id: "CIF-098455", customerType: "Individual", name: "Heng Bunthoeun", khmerName: "ហេង ប៊ុនធឿន", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
     phone: "+855 92 118 675", email: "bunthoeun.h@outlook.com", dob: "1979-09-14", address: "BKK1, Chamkarmon, Phnom Penh",
     idType: "Passport", idNo: "N0882134", idExpiry: "2030-06-30",
     occupation: "Director", company: "Mekong Holdings", incomeUSD: 12500,
@@ -111,7 +119,7 @@ export const CUSTOMERS: Customer[] = [
     interactions: [{ date: "2026-07-05", channel: "RM Call", note: "Interested in NBC bond allocation next tranche" }],
   },
   {
-    id: "CIF-100998", name: "Nov Chanthy", khmerName: "នៅ ចាន់ធី", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
+    id: "CIF-100998", customerType: "Individual", name: "Nov Chanthy", khmerName: "នៅ ចាន់ធី", gender: "Male", marital: "Married", nationality: "Cambodia (KH)",
     phone: "+855 69 445 210", email: "chanthy.nov@gmail.com", dob: "1992-12-03", address: "Svay Por, Battambang",
     idType: "National ID", idNo: "017 665 401", idExpiry: "2028-11-19",
     occupation: "Farmer", company: "—", incomeUSD: null,
@@ -123,6 +131,25 @@ export const CUSTOMERS: Customer[] = [
     investments: [], insurance: [],
     devices: [{ name: "Xiaomi Redmi 12", lastSeen: "2026-07-01", trusted: true }],
     interactions: [{ date: "2026-07-06", channel: "Collections Call", note: "Promised payment by Jul 15 — hardship: seasonal income" }],
+  },
+  {
+    id: "CIF-102890", customerType: "Corporate", name: "Angkor Logistics Co., Ltd.", khmerName: "អង្គរ ឡូជីស្ទិក", gender: "Male", marital: "—", nationality: "Cambodia (KH)",
+    phone: "+855 23 900 112", email: "ops@angkorlogistics.com.kh", dob: "2015-04-20", address: "Phnom Penh SEZ, National Road 4, Phnom Penh",
+    idType: "Business Registration", idNo: "00012345", idExpiry: "2028-04-19",
+    occupation: "—", company: "Angkor Logistics Co., Ltd.", incomeUSD: 480000,
+    registrationNo: "00012345 (MoC)", incorporationDate: "2015-04-20", businessNature: "Freight & logistics", contactPerson: "Sok Piseth · Finance Director",
+    segment: "SME", kyc: "Verified", risk: "Medium", ecdd: "N", branch: "Phnom Penh HQ", joined: "2015-05-02",
+    ebanking: ["smartBiz", "Payroll", "Virtual Acc."],
+    accounts: [
+      { no: "010-900-112", type: "Current (Business)", ccy: "USD", balance: 152300.4, status: "Active" },
+      { no: "010-900-113", type: "Current (Business)", ccy: "KHR", balance: 88000000, status: "Active" },
+    ],
+    cards: [{ no: "•••• 7781", type: "Visa Business Debit", status: "Active", limits: "$10,000/day", controls: { online: true, contactless: true, intl: true } }],
+    loans: [{ id: "LN-2025-2210", product: "SME Term Loan", amount: 200000, ccy: "USD", outstanding: 145000, rate: "9.5%", nextDue: "2026-08-05", status: "Performing" }],
+    investments: [],
+    insurance: [{ policy: "Commercial Property", premium: "$210/mo", renewal: "2027-03-01", status: "Active" }],
+    devices: [{ name: "Company Portal (web)", lastSeen: "Today 09:15", trusted: true }],
+    interactions: [{ date: "2026-07-12", channel: "RM Visit", note: "Reviewed payroll batch limits and FX needs for Q3 imports" }],
   },
 ];
 

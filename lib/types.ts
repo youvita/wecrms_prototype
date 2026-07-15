@@ -1,6 +1,7 @@
 // Domain types for WeCRM365
 
 export type Segment = "Mass" | "Affluent" | "SME";
+export type CustomerType = "Individual" | "Corporate";
 export type KycStatus = "Verified" | "Pending" | "Review due";
 export type Risk = "Low" | "Medium" | "High";
 
@@ -31,6 +32,28 @@ export interface Loan {
   status: string;
 }
 
+// Links a CIF to a *different* related CIF (e.g. a company and its distinct subsidiary).
+export interface RelatedParty { cif: string; role: string }
+
+// A single CIF can carry BOTH an individual and a corporate facet (e.g. a sole
+// proprietor who banks personally and as their business under one relationship).
+// The individual facet lives in the flat Customer fields; this is the corporate one.
+export interface CorporateFacet {
+  name: string;
+  khmerName: string;
+  businessNature: string;
+  nationality: string;       // country of incorporation
+  incorporationDate: string;
+  idType: string;            // registration document, e.g. "Business Registration"
+  registrationNo: string;
+  idExpiry: string;          // registration expiry
+  phone: string;
+  email: string;
+  address: string;
+  contactPerson: string;
+  incomeUSD: number | null;  // annual revenue
+}
+
 export interface Investment { type: string; detail: string; value: number }
 export interface Insurance { policy: string; premium: string; renewal: string; status: string }
 export interface Device { name: string; lastSeen: string; trusted: boolean }
@@ -38,6 +61,7 @@ export interface Interaction { date: string; channel: string; note: string }
 
 export interface Customer {
   id: string;
+  customerType: CustomerType;
   name: string;
   khmerName: string;
   gender: "Male" | "Female";
@@ -53,6 +77,16 @@ export interface Customer {
   occupation: string;
   company: string;
   incomeUSD: number | null;
+  // Corporate-only — populated when customerType === "Corporate".
+  registrationNo?: string;
+  incorporationDate?: string;
+  businessNature?: string;
+  contactPerson?: string;
+  relatedParties?: RelatedParty[];
+  // Which facets this CIF holds. Defaults to [customerType] when omitted.
+  // When it contains both, the Customer Info tab shows Individual|Corporate sub-tabs.
+  profiles?: CustomerType[];
+  corporate?: CorporateFacet;   // the corporate facet on a dual (Individual+Corporate) CIF
   segment: Segment;
   kyc: KycStatus;
   risk: Risk;
