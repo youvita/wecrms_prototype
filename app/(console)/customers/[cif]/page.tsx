@@ -3,12 +3,22 @@
 import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CUSTOMERS, TRANSACTIONS, CASES, CURRENT_USER } from "@/lib/data";
+import { CUSTOMERS, TRANSACTIONS, CURRENT_USER } from "@/lib/data";
 import { formatDate, formatMoney, getInitial, segmentLabel } from "@/lib/format";
 import { Badge, EmptyState, Icon, Toast, type ToastMsg } from "@/components/ui";
 import type { Customer, CorporateFacet } from "@/lib/types";
 
-const TABS = ["Customer Information", "Activity", "Accounts", "Deposits", "Cards", "Loans", "Investments", "Insurances", "Interactions", "Support", "Security"] as const;
+const TABS = [
+  "Customer Information", "Accounts", "Payments", "Fixed Deposits", "Cards", "Loans", "Investments", "Insurances",
+  "Locations", "Sales Activities", "Call Center", "Compliance", "CBC", "Reminder", "Merchants",
+  "Internet Banking", "Mobile Banking", "Cash ATM", "Mini App", "Gift Zone", "Loyalty Points", "Reports", "Security", "Audit Logs",
+] as const;
+// Tabs added to the navigation but whose detailed content is not built yet.
+const PLACEHOLDER_TABS: readonly string[] = [
+  "Locations", "Sales Activities", "Call Center", "Compliance", "CBC", "Reminder", "Merchants",
+  "Cash ATM", "Mini App", "Gift Zone", "Loyalty Points", "Reports",
+];
+const AUDIT_CATEGORIES = ["All", "Profile", "Access", "Servicing", "Consent & docs", "Security", "Approvals"];
 const TXN_CHANNELS = ["All", "KHQR", "Bakong", "Transfer", "Bill"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -71,6 +81,16 @@ function OnOff({ on }: { on: boolean }) {
   return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${on ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>{on ? "On" : "Off"}</span>;
 }
 
+// Compact KPI tile used by the digital-channel tabs.
+function StatTile({ label, value, cls = "text-slate-900" }: { label: string; value: React.ReactNode; cls?: string }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className={`text-xl font-extrabold mt-1 ${cls}`}>{value}</div>
+    </div>
+  );
+}
+
 // Deterministic demo values derived from the (masked) card number.
 const cardExpiry = (no: string) => { const n = parseInt(no.replace(/\D/g, "").slice(-4) || "1", 10); return `${String((n % 12) + 1).padStart(2, "0")}/${28 + (n % 3)}`; };
 const cardSpend = (no: string) => { const n = parseInt(no.replace(/\D/g, "").slice(-4) || "1", 10); return 200 + (n % 1800); };
@@ -101,6 +121,121 @@ function cardTxns(no: string) {
       date: `2026-07-${String(day).padStart(2, "0")}`,
       amount,
       status: i % 5 === 2 ? "Pending" : "Posted",
+    };
+  });
+}
+
+// Deterministic per-customer payment history — the real mock TRANSACTIONS are sparse
+// (1–2 per customer), so we synthesize a fuller 30-day statement for the Payments tab.
+type PayRow = { id: string; date: string; time: string; type: string; channel: string; counterparty: string; amount: number; ccy: "USD" | "KHR"; status: string };
+const PAY_TEMPLATES: { type: string; channel: string; cp: string; base: number; ccy: "USD" | "KHR" }[] = [
+  { type: "KHQR Payment", channel: "KHQR", cp: "Brown Coffee — BKK1", base: -12.5, ccy: "USD" },
+  { type: "KHQR Payment", channel: "KHQR", cp: "Lucky Supermarket", base: -38, ccy: "USD" },
+  { type: "Bakong Transfer", channel: "Bakong", cp: "→ Wing (012 345 678)", base: -25, ccy: "USD" },
+  { type: "Bill Payment", channel: "Bill", cp: "EDC Electricity", base: -85000, ccy: "KHR" },
+  { type: "Mobile Top-up", channel: "Bill", cp: "Smart Axiata", base: -5, ccy: "USD" },
+  { type: "Interbank Transfer", channel: "Transfer", cp: "→ ACLEDA ••3391", base: -120, ccy: "USD" },
+  { type: "Fund Transfer In", channel: "Transfer", cp: "← ABA ••8842", base: 300, ccy: "USD" },
+  { type: "Salary Credit", channel: "Transfer", cp: "Monthly payroll", base: 900, ccy: "USD" },
+];
+function buildPayments(name: string, cif: string): PayRow[] {
+  const seed = parseInt(cif.replace(/\D/g, "").slice(-4) || "1", 10);
+  const real: PayRow[] = TRANSACTIONS.filter((t) => t.customer === name).map((t) => ({
+    id: t.id, date: "2026-07-15", time: t.time, type: t.type, channel: t.channel,
+    counterparty: t.counterparty, amount: t.amount, ccy: t.ccy, status: t.status,
+  }));
+  const count = 16 + (seed % 8);
+  const base = new Date("2026-07-15");
+  const gen: PayRow[] = Array.from({ length: count }, (_, i) => {
+    const tpl = PAY_TEMPLATES[(seed + i) % PAY_TEMPLATES.length];
+    const d = new Date(base); d.setDate(base.getDate() - ((i % 15) * 2) - 1); // within ~30 days
+    const mult = 1 + ((seed + i * 7) % 60) / 100;
+    const raw = tpl.base * mult;
+    const amount = tpl.ccy === "KHR" ? Math.round(raw / 500) * 500 : Math.round(raw * 100) / 100;
+    return {
+      id: `TXN-${seed}${String(i).padStart(2, "0")}`,
+      date: d.toISOString().slice(0, 10),
+      time: `${String(8 + (i % 11)).padStart(2, "0")}:${String((seed * 7 + i * 13) % 60).padStart(2, "0")}`,
+      type: tpl.type, channel: tpl.channel, counterparty: tpl.cp, amount, ccy: tpl.ccy,
+      status: i % 11 === 4 ? "Reversed" : "Success",
+    };
+  });
+  return [...real, ...gen].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.time < b.time ? 1 : -1));
+}
+
+// Deterministic staff/system audit trail for a customer record (read-only, immutable).
+type AuditCategory = "Profile" | "Access" | "Servicing" | "Consent & docs" | "Security" | "Approvals";
+type AuditRow = {
+  id: string; ts: string; date: string; actor: string; role: string; actorId: string;
+  category: AuditCategory; action: string; field?: string; before?: string; after?: string;
+  source: string; result: "Success" | "Failed" | "Pending"; sensitive?: boolean;
+};
+const AUDIT_ACTORS = [
+  { name: "Tit Thida", role: "Teller", id: "116005", src: "Branch · Toul Kork" },
+  { name: "Mom Thavy", role: "Relationship Officer", id: "124142", src: "Branch · Pochentong" },
+  { name: "Sok Chanthy", role: "Officer", id: "118330", src: "Branch · Siem Reap" },
+  { name: "System", role: "Automated", id: "SYS", src: "Core Banking" },
+  { name: "Dara Kong", role: "Supervisor", id: "121002", src: "HQ · Phnom Penh" },
+];
+const AUDIT_EVENTS: Omit<AuditRow, "id" | "ts" | "date" | "actor" | "role" | "actorId" | "source">[] = [
+  { category: "Access", action: "Viewed customer profile", result: "Success" },
+  { category: "Access", action: "Exported customer info for CBC", result: "Success", sensitive: true },
+  { category: "Profile", action: "Updated customer address", field: "address", before: "St. 271, Toul Kork", after: "St. 315, Boeung Kak", result: "Success" },
+  { category: "Profile", action: "Updated mobile number", field: "phone", before: "+855 12 456 789", after: "+855 12 456 700", result: "Success" },
+  { category: "Profile", action: "Changed KYC status", field: "kyc", before: "Verified", after: "Review due", result: "Success", sensitive: true },
+  { category: "Servicing", action: "Blocked debit card ••5518", field: "card.status", before: "Active", after: "Blocked", result: "Success", sensitive: true },
+  { category: "Servicing", action: "Opened savings account", result: "Success" },
+  { category: "Consent & docs", action: "Uploaded income document", result: "Success" },
+  { category: "Consent & docs", action: "Updated marketing consent", field: "consent", before: "Not set", after: "Opted in", result: "Success" },
+  { category: "Security", action: "MFA reset requested", result: "Success", sensitive: true },
+  { category: "Security", action: "Failed login attempt", result: "Failed" },
+  { category: "Approvals", action: "Limit-increase request submitted", result: "Pending" },
+  { category: "Approvals", action: "Approved risk-rating override", field: "risk", before: "Medium", after: "Low", result: "Success", sensitive: true },
+];
+function buildAuditLogs(cif: string): AuditRow[] {
+  const num = cif.replace(/\D/g, "").slice(-4) || "1";
+  const seed = parseInt(num, 10);
+  const count = 22 + (seed % 10);
+  const base = new Date("2026-07-15");
+  return Array.from({ length: count }, (_, i) => {
+    const ev = AUDIT_EVENTS[(seed + i * 3) % AUDIT_EVENTS.length];
+    const actor = AUDIT_ACTORS[(seed + i) % AUDIT_ACTORS.length];
+    const d = new Date(base); d.setDate(base.getDate() - (i % 20));
+    const date = d.toISOString().slice(0, 10);
+    const ts = `${date} ${String(8 + (i % 10)).padStart(2, "0")}:${String((seed * 7 + i * 11) % 60).padStart(2, "0")}:${String((seed * 13 + i * 7) % 60).padStart(2, "0")}`;
+    return {
+      ...ev,
+      id: `AUD-${num}-${String(i).padStart(4, "0")}`,
+      ts, date,
+      actor: actor.name, role: actor.role, actorId: actor.id,
+      source: actor.name === "System" ? actor.src : `${actor.src} · 10.2.${(seed + i) % 254}`,
+    };
+  }).sort((a, b) => (a.ts < b.ts ? 1 : -1));
+}
+
+// Deterministic mobile-banking login history with location tracking.
+const MB_LOCATIONS = [
+  { city: "Phnom Penh · KH", ip: "116.212", foreign: false },
+  { city: "Toul Kork, Phnom Penh · KH", ip: "10.2", foreign: false },
+  { city: "Siem Reap · KH", ip: "175.100", foreign: false },
+  { city: "Battambang · KH", ip: "203.144", foreign: false },
+  { city: "Bangkok · TH", ip: "184.22", foreign: true },
+];
+type MbLogin = { id: string; ts: string; method: string; device: string; city: string; ip: string; foreign: boolean; result: "Success" | "Failed" | "Blocked" };
+function mobileLogins(cif: string, deviceName: string): MbLogin[] {
+  const seed = parseInt(cif.replace(/\D/g, "").slice(-4) || "1", 10);
+  const count = 18 + (seed % 18); // 18–35 logins over the period
+  const base = new Date("2026-07-15");
+  return Array.from({ length: count }, (_, i) => {
+    const loc = MB_LOCATIONS[(seed + i * 2) % MB_LOCATIONS.length];
+    const d = new Date(base); d.setDate(base.getDate() - Math.floor((i * 29) / count));
+    const method = (["Biometric", "PIN", "OTP"] as const)[(seed + i) % 3];
+    const result: MbLogin["result"] = loc.foreign && i % 3 === 0 ? "Blocked" : ((seed + i) % 9 === 4 ? "Failed" : "Success");
+    return {
+      id: `MBL-${seed}${i}`,
+      ts: `${d.toISOString().slice(0, 10)} ${String(7 + (i * 3) % 15).padStart(2, "0")}:${String((seed * 7 + i * 11) % 60).padStart(2, "0")}`,
+      method, device: deviceName, city: loc.city,
+      ip: `${loc.ip}.${(seed + i) % 254}.${(seed * 3 + i) % 254}`, foreign: loc.foreign, result,
     };
   });
 }
@@ -159,7 +294,25 @@ export default function Customer360Page() {
   const corpPrimary = customer.customerType === "Corporate" && !customer.corporate;
 
   const [tab, setTab] = React.useState<Tab>("Customer Information");
-  const [actCh, setActCh] = React.useState<string>("All");
+  const [actCh, setActCh] = React.useState<string>("All");     // Payments: channel filter
+  const [payQ, setPayQ] = React.useState("");                   // Payments: search + status + date + paging
+  const [payStatus, setPayStatus] = React.useState("All");
+  const [payFrom, setPayFrom] = React.useState("");
+  const [payTo, setPayTo] = React.useState("");
+  const [payPage, setPayPage] = React.useState(1);
+  const [payPerPage, setPayPerPage] = React.useState(8);
+  const [audQ, setAudQ] = React.useState("");                  // Audit Logs: filters + paging + expand
+  const [audCat, setAudCat] = React.useState("All");
+  const [audActor, setAudActor] = React.useState("All");
+  const [audResult, setAudResult] = React.useState("All");
+  const [audFrom, setAudFrom] = React.useState("");
+  const [audTo, setAudTo] = React.useState("");
+  const [audPage, setAudPage] = React.useState(1);
+  const [audPerPage, setAudPerPage] = React.useState(8);
+  const [audOpen, setAudOpen] = React.useState<string | null>(null);
+  const [mblPage, setMblPage] = React.useState(1);              // Mobile login-history pagination
+  const [mblPerPage, setMblPerPage] = React.useState(6);
+  const [selectedFdNo, setSelectedFdNo] = React.useState<string | null>(null); // selected fixed deposit
   const [cardIdx, setCardIdx] = React.useState(0);      // selected card in the Cards tab
   const [txnPage, setTxnPage] = React.useState(1);      // card-transactions pagination
   const [txnPerPage, setTxnPerPage] = React.useState(5);
@@ -216,11 +369,12 @@ export default function Customer360Page() {
   };
 
   const custTxns = TRANSACTIONS.filter((t) => t.customer === customer.name);
-  const inflow = custTxns.filter((t) => t.amount > 0).reduce((s, t) => s + usd(t.amount, t.ccy), 0);
-  const outflow = custTxns.filter((t) => t.amount < 0).reduce((s, t) => s + usd(Math.abs(t.amount), t.ccy), 0);
-  const channelMix = (["KHQR", "Bakong", "Transfer", "Bill"] as const).map((ch) => ({ ch, n: custTxns.filter((t) => t.channel === ch).length })).filter((c) => c.n > 0);
   const lifecycle = custTxns.length === 0 ? "Dormant" : custTxns.length >= 3 ? "Active" : "Low activity";
-  const actRows = actCh === "All" ? custTxns : custTxns.filter((t) => t.channel === actCh);
+
+  // Payments tab — full statement, summary and channel mix.
+  const payments = buildPayments(customer.name, customer.id);
+  const payIn = payments.filter((t) => t.amount > 0).reduce((s, t) => s + usd(t.amount, t.ccy), 0);
+  const payOut = payments.filter((t) => t.amount < 0).reduce((s, t) => s + usd(Math.abs(t.amount), t.ccy), 0);
 
   // Goal-based savings (Deposits capability) — synthesized demo goal for savers.
   const savingsBal = customer.accounts.filter((a) => a.type.startsWith("Savings")).reduce((s, a) => s + usd(a.balance, a.ccy), 0);
@@ -243,8 +397,6 @@ export default function Customer360Page() {
   ];
   const usedCount = servicesInUse.filter((s) => s.on).length;
 
-  // Support cases linked to this customer (read-only).
-  const cases = CASES.filter((c) => c.cif === customer.id);
 
   // KYC / CDD, consent & documents — synthesized for the demo (view-only).
   const kycReview = (() => { const d = new Date(customer.joined); d.setFullYear(d.getFullYear() + 3); return d.toISOString().slice(0, 10); })();
@@ -258,7 +410,7 @@ export default function Customer360Page() {
   ];
   const kycOverdue = customer.kyc === "Review due" || new Date(kycReview) < new Date();
 
-  // Relationship value (view-only): deposits + investments (USD eq.) and loan exposure.
+  // Relationship value (view-only): deposits + investments (USD) and loan exposure.
   const aum = customer.accounts.reduce((s, a) => s + usd(a.balance, a.ccy), 0) + customer.investments.reduce((s, i) => s + i.value, 0);
   const loanOut = customer.loans.reduce((s, l) => s + usd(l.outstanding, l.ccy), 0);
 
@@ -269,10 +421,7 @@ export default function Customer360Page() {
 
   // Tab summaries (view-only).
   const acctTotals = casaAccounts.reduce((m, a) => { m[a.ccy] = (m[a.ccy] || 0) + a.balance; return m; }, {} as Record<string, number>);
-  const depositTotals = termDeposits.reduce((m, a) => { m[a.ccy] = (m[a.ccy] || 0) + a.balance; return m; }, {} as Record<string, number>);
   const investTotal = customer.investments.reduce((s, i) => s + i.value, 0);
-  const openCases = cases.filter((c) => !/resolved|closed|complete/i.test(c.status)).length;
-  const slaBreaches = cases.filter((c) => c.slaState === "breach").length;
   const lastLogin = customer.devices[0]?.lastSeen ?? "—";
   const activeSessions = customer.devices.filter((d) => d.trusted).length;
   const tenureYears = Math.max(1, new Date().getFullYear() - new Date(customer.joined).getFullYear());
@@ -358,7 +507,7 @@ export default function Customer360Page() {
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
             <h3 className="font-bold text-slate-900 text-sm mb-3">Relationship value</h3>
             <div className="text-2xl font-extrabold text-slate-900">{formatMoney(Math.round(aum), "USD")}</div>
-            <div className="text-xs text-slate-400">Deposits + investments (USD eq.)</div>
+            <div className="text-xs text-slate-400">Deposits + investments (USD)</div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between text-sm">
               <span className="text-slate-500">Loans outstanding</span>
               <span className="font-semibold text-slate-800">{loanOut > 0 ? formatMoney(Math.round(loanOut), "USD") : "—"}</span>
@@ -374,7 +523,7 @@ export default function Customer360Page() {
               <div className="space-y-3">
                 {([
                   { title: "Accounts", items: casaAccounts.map((a) => acctLabel(a.type, a.ccy)) },
-                  { title: "Deposits", items: termDeposits.map((a) => acctLabel(a.type, a.ccy)) },
+                  { title: "Fixed Deposits", items: termDeposits.map((a) => acctLabel(a.type, a.ccy)) },
                   { title: "Cards", items: customer.cards.map((cd) => cd.type) },
                   { title: "Loans", items: customer.loans.map((l) => l.product) },
                 ] as const).filter((g) => g.items.length > 0).map((g) => (
@@ -715,72 +864,149 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* --- Activity / usage (read-only) --- */}
-          {tab === "Activity" && (
+          {/* --- Payments / transaction statement (read-only) --- */}
+          {tab === "Payments" && (() => {
+            const payFiltering = !!(payQ || payStatus !== "All" || payFrom || payTo || actCh !== "All");
+            const rows = payments.filter((t) => {
+              const chOk = actCh === "All" || t.channel === actCh;
+              const stOk = payStatus === "All" || t.status === payStatus;
+              const q = payQ.trim().toLowerCase();
+              const qOk = !q || (t.counterparty + " " + t.type + " " + t.id).toLowerCase().includes(q);
+              const fOk = !payFrom || t.date >= payFrom;
+              const tOk = !payTo || t.date <= payTo;
+              return chOk && stOk && qOk && fOk && tOk;
+            });
+            const totalPages = Math.max(1, Math.ceil(rows.length / payPerPage));
+            const pageC = Math.min(payPage, totalPages);
+            const start = (pageC - 1) * payPerPage;
+            const pageRows = rows.slice(start, start + payPerPage);
+            const net = payIn - payOut;
+            return (
             <div className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Engagement</div>
-                  <div className={`text-xl font-extrabold mt-1 ${lifecycle === "Active" ? "text-green-600" : lifecycle === "Dormant" ? "text-red-600" : "text-amber-600"}`}>{lifecycle}</div>
-                  <div className="text-xs text-slate-400 mt-1">{custTxns.length} transactions on record</div>
-                </div>
+              {/* Summary tiles */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Money in</div>
-                  <div className="text-xl font-extrabold text-green-600 mt-1">{formatMoney(Math.round(inflow), "USD")}</div>
-                  <div className="text-xs text-slate-400 mt-1">Credits (USD eq.)</div>
+                  <div className="text-xl font-extrabold text-green-600 mt-1">{formatMoney(Math.round(payIn), "USD")}</div>
+                  <div className="text-xs text-slate-400 mt-1">Credits (USD)</div>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Money out</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{formatMoney(Math.round(outflow), "USD")}</div>
-                  <div className="text-xs text-slate-400 mt-1">Debits (USD eq.)</div>
+                  <div className="text-xl font-extrabold text-slate-900 mt-1">{formatMoney(Math.round(payOut), "USD")}</div>
+                  <div className="text-xs text-slate-400 mt-1">Debits (USD)</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Net flow</div>
+                  <div className={`text-xl font-extrabold mt-1 ${net >= 0 ? "text-green-600" : "text-red-600"}`}>{net >= 0 ? "+" : "−"}{formatMoney(Math.abs(Math.round(net)), "USD")}</div>
+                  <div className="text-xs text-slate-400 mt-1">In − out (USD)</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Transactions</div>
+                  <div className="text-xl font-extrabold text-slate-900 mt-1">{payments.length}</div>
+                  <div className="text-xs text-slate-400 mt-1">Last 30 days</div>
                 </div>
               </div>
 
-              {channelMix.length > 0 && (
-                <Section title="Channel usage">
-                  <div className="space-y-3">
-                    {channelMix.map((c) => {
-                      const pct = Math.round((c.n / custTxns.length) * 100);
-                      return (
-                        <div key={c.ch}>
-                          <div className="flex justify-between text-sm mb-1"><span className="text-slate-600">{c.ch}</span><span className="font-semibold text-slate-700">{c.n} · {pct}%</span></div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-gold rounded-full" style={{ width: `${pct}%` }} /></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Section>
-              )}
+              {/* Transactions table */}
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 text-sm">Transactions</h3>
+                  <span className="text-xs text-slate-400">Last 30 days</span>
+                </div>
 
-              <Section title="Transactions"
-                action={
-                  <div className="flex gap-1">
-                    {TXN_CHANNELS.map((c) => (
-                      <button key={c} onClick={() => setActCh(c)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${actCh === c ? "bg-gold text-navy" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>{c}</button>
-                    ))}
+                {/* Filters: search + channel + status + date range */}
+                <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3">
+                  <div className="relative w-44">
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
+                    <input value={payQ} onChange={(e) => { setPayQ(e.target.value); setPayPage(1); }} placeholder="Search…"
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
                   </div>
-                }>
-                {actRows.length === 0 ? <EmptyState icon="receipt_long" message="No transactions in this channel" /> : (
-                  <div className="divide-y divide-slate-100">
-                    {actRows.map((t) => (
-                      <div key={t.id} className="py-2.5 flex items-center gap-3">
-                        <Icon name={t.channel === "KHQR" ? "qr_code_2" : t.channel === "Bakong" ? "currency_exchange" : t.channel === "Bill" ? "receipt" : "swap_horiz"}
-                          className="text-primary-600 bg-primary-50 rounded-lg p-1.5 text-xl flex-none" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-slate-800 truncate">{t.type}</div>
-                          <div className="text-xs text-slate-400 truncate">{t.counterparty} · {t.channel} · {t.time}</div>
-                        </div>
-                        <div className={`text-sm font-semibold flex-none ${t.amount > 0 ? "text-green-600" : "text-slate-800"}`}>
-                          {t.amount > 0 ? "+" : ""}{formatMoney(Math.abs(t.amount), t.ccy)}
+                  <select value={actCh} onChange={(e) => { setActCh(e.target.value); setPayPage(1); }}
+                    className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+                    {TXN_CHANNELS.map((c) => <option key={c} value={c}>{c === "All" ? "All channels" : c}</option>)}
+                  </select>
+                  <select value={payStatus} onChange={(e) => { setPayStatus(e.target.value); setPayPage(1); }}
+                    className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+                    {["All", "Success", "Reversed"].map((s) => <option key={s} value={s}>{s === "All" ? "All statuses" : s}</option>)}
+                  </select>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-xs font-medium text-slate-500">From</span>
+                    <input type="date" value={payFrom} onChange={(e) => { setPayFrom(e.target.value); setPayPage(1); }}
+                      className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
+                    <span className="text-xs font-medium text-slate-500">To</span>
+                    <input type="date" value={payTo} onChange={(e) => { setPayTo(e.target.value); setPayPage(1); }}
+                      className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
+                  </div>
+                  {payFiltering && (
+                    <button onClick={() => { setPayQ(""); setActCh("All"); setPayStatus("All"); setPayFrom(""); setPayTo(""); setPayPage(1); }}
+                      className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800">
+                      <Icon name="close" className="text-base" />Clear
+                    </button>
+                  )}
+                </div>
+
+                {rows.length === 0 ? (
+                  <EmptyState icon="receipt_long" message="No transactions match your filters" />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Description</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Channel</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Reference</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Date</th>
+                          <th className="text-right px-4 py-3 font-semibold text-slate-600">Amount</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {pageRows.map((t) => (
+                          <tr key={t.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <Icon name={t.channel === "KHQR" ? "qr_code_2" : t.channel === "Bakong" ? "currency_exchange" : t.channel === "Bill" ? "receipt" : "swap_horiz"}
+                                  className="text-primary-600 bg-primary-50 rounded-lg p-1.5 text-lg flex-none" />
+                                <div className="min-w-0">
+                                  <div className="font-medium text-slate-800 truncate">{t.type}</div>
+                                  <div className="text-xs text-slate-400 truncate">{t.counterparty}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{t.channel}</td>
+                            <td className="px-4 py-3 text-slate-400 font-mono text-xs hidden lg:table-cell">{t.id}</td>
+                            <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(t.date)} · {t.time}</td>
+                            <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${t.amount > 0 ? "text-green-600" : "text-slate-800"}`}>{t.amount > 0 ? "+" : "−"}{formatMoney(Math.abs(t.amount), t.ccy)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${t.status === "Reversed" ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{t.status}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-sm">
+                      <div className="text-slate-500">Showing {start + 1}–{Math.min(start + payPerPage, rows.length)} of {rows.length} transactions</div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-slate-500">
+                          <span className="whitespace-nowrap">Rows per page</span>
+                          <select value={payPerPage} onChange={(e) => { setPayPerPage(Number(e.target.value)); setPayPage(1); }}
+                            className="border border-slate-300 rounded-lg pl-3 pr-8 py-1.5 text-sm text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600">
+                            {[8, 15, 30].map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button disabled={pageC <= 1} onClick={() => setPayPage(pageC - 1)} className={`px-2.5 py-1 rounded-md ${pageC <= 1 ? "text-slate-300" : "text-slate-600 hover:bg-slate-100"}`}>Previous</button>
+                          <span className="text-slate-500">Page {pageC} of {totalPages}</span>
+                          <button disabled={pageC >= totalPages} onClick={() => setPayPage(pageC + 1)} className={`px-2.5 py-1 rounded-md ${pageC >= totalPages ? "text-slate-300" : "text-slate-600 hover:bg-slate-100"}`}>Next</button>
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 )}
-              </Section>
+              </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* --- Accounts (CASA — Current & Savings) --- */}
           {tab === "Accounts" && (
@@ -840,50 +1066,119 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* --- Deposits (term / fixed deposits) --- */}
-          {tab === "Deposits" && (
-            termDeposits.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-xl">
-                <EmptyState icon="lock_clock" message="No term deposits" />
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  {termDeposits.map((a) => {
-                    // Parse rate + term from the product label; maturity from status.
-                    const rate = a.type.match(/([\d.]+)\s*%/)?.[1];
-                    const term = a.type.match(/(\d+)\s*M/i)?.[1];
-                    const maturity = a.status.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-                    const projInterest = rate && term ? (a.balance * (parseFloat(rate) / 100) * (parseInt(term) / 12)) : null;
-                    return (
-                      <div key={a.no} className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                        <div className="flex items-start justify-between gap-3 mb-4">
+          {/* --- Fixed Deposits (master / detail) --- */}
+          {tab === "Fixed Deposits" && (
+            <div className="space-y-5">
+              <Section title="Fixed Deposits">
+                {(() => {
+                  // Map the customer's real fixed-deposit accounts to a consistent shape.
+                  const mappedActual = termDeposits.map((a) => {
+                    const [name, ratePart] = a.type.split("·");
+                    const rate = ratePart ? ratePart.trim() : "5.25%";
+                    const termMatch = name.match(/(\d+)\s*M/i);
+                    const termNum = termMatch ? parseInt(termMatch[1]) : 12;
+                    const projected = a.balance * (parseFloat(rate) / 100) * (termNum / 12);
+                    return { no: a.no, type: name.trim(), ccy: a.ccy, balance: a.balance, status: a.status, rate: rate.includes("%") ? rate : `${rate}%`, term: `${termNum} months`, projected };
+                  });
+                  // Demo products so the master/detail view is populated.
+                  const dummyFDs = [
+                    { no: "001-999-001", type: "Regular Fixed Deposit", ccy: "USD" as const, balance: 10000, status: "Matures 2027-01-15", rate: "4.50%", term: "6 months", projected: 225 },
+                    { no: "001-999-002", type: "Flexible Fixed Deposit", ccy: "USD" as const, balance: 5000, status: "Matures 2026-10-15", rate: "3.75%", term: "3 months", projected: 46.88 },
+                    { no: "001-999-005", type: "Premium / VIP Fixed Deposit", ccy: "USD" as const, balance: 150000, status: "Matures 2028-07-15", rate: "6.25%", term: "24 months", projected: 18750 },
+                  ];
+                  const allFDs = [...mappedActual, ...dummyFDs];
+                  if (allFDs.length === 0) return <EmptyState icon="savings" message="No fixed deposits" />;
+                  const activeFD = allFDs.find((f) => f.no === selectedFdNo) || allFDs[0];
+
+                  return (
+                    <div>
+                      {/* Top row: selectable thumbnails */}
+                      <div className="flex gap-4 overflow-x-auto pb-4 mb-2">
+                        {allFDs.map((fd) => {
+                          const isActive = activeFD.no === fd.no;
+                          return (
+                            <div key={fd.no} onClick={() => setSelectedFdNo(fd.no)}
+                              className={`flex-none w-64 p-4 rounded-xl border cursor-pointer transition-all ${isActive ? "border-gold bg-goldbg shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}>
+                              <div className="flex justify-between items-start mb-4">
+                                <div className="text-xs font-bold tracking-wide text-slate-800 truncate pr-2">{fd.type}</div>
+                                <div className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{fd.ccy}</div>
+                              </div>
+                              <div className="text-xl font-extrabold text-slate-900 tracking-tight">{formatMoney(fd.balance, fd.ccy)}</div>
+                              <div className="text-[11px] font-mono text-slate-500 mt-1">{fd.no}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Bottom: unified detail view */}
+                      <div className="border border-slate-200 bg-white rounded-xl shadow-sm p-6 md:p-8 mt-4">
+                        <div className="flex flex-col md:flex-row justify-between items-start mb-8 pb-8 border-b border-slate-100">
                           <div>
-                            <div className="font-bold text-slate-900">{a.type.split("·")[0].trim()}</div>
-                            <div className="text-xs text-slate-400 font-mono mt-0.5">{a.no}</div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="text-[10px] font-bold tracking-wide text-primary-700 uppercase bg-primary-50 px-2 py-1 rounded">{activeFD.type}</div>
+                              <div className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">ACC: {activeFD.no}</div>
+                            </div>
+                            <div className="mt-4">
+                              <div className="text-4xl font-extrabold tracking-tight text-slate-900">{formatMoney(activeFD.balance, activeFD.ccy)}</div>
+                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-1">Principal placed</div>
+                            </div>
                           </div>
-                          <span className="inline-flex px-2.5 py-1 rounded-lg bg-primary-50 text-primary-800 text-xs font-semibold">{a.ccy} Fixed Deposit</span>
+                          <div className="mt-6 md:mt-0 md:text-right">
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Maturity date</div>
+                            <div className="text-lg font-bold text-slate-900">{activeFD.status.replace("Matures ", "")}</div>
+                          </div>
                         </div>
-                        <div className="text-2xl font-extrabold text-slate-900">{formatMoney(a.balance, a.ccy)}</div>
-                        <div className="text-xs text-slate-400 mb-4">Principal placed</div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                          <div><div className="text-xs text-slate-400">Interest rate</div><div className="font-semibold text-slate-800">{rate ? `${rate}% p.a.` : "—"}</div></div>
-                          <div><div className="text-xs text-slate-400">Term</div><div className="font-semibold text-slate-800">{term ? `${term} months` : "—"}</div></div>
-                          <div><div className="text-xs text-slate-400">Maturity date</div><div className="font-semibold text-slate-800">{maturity ? formatDate(maturity) : "—"}</div></div>
-                          <div><div className="text-xs text-slate-400">Projected interest</div><div className="font-semibold text-green-600">{projInterest != null ? formatMoney(Math.round(projInterest), a.ccy) : "—"}</div></div>
+
+                        <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
+                          <div className="space-y-8">
+                            <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Interest rate</div>
+                                <div className="text-sm font-semibold text-slate-900">{activeFD.rate} p.a.</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Term</div>
+                                <div className="text-sm font-semibold text-slate-900">{activeFD.term}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Projected int.</div>
+                                <div className="text-sm font-bold text-green-600">{formatMoney(activeFD.projected, activeFD.ccy)}</div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Account instructions</h4>
+                              <div className="space-y-3 text-sm">
+                                <div className="flex justify-between items-center"><span className="text-slate-600">Interest payment</span><span className="font-semibold text-slate-800">{activeFD.type.includes("Monthly") ? "Monthly" : "At maturity"}</span></div>
+                                <div className="flex justify-between items-center"><span className="text-slate-600">Maturity action</span><span className="font-semibold text-slate-800 text-right">{activeFD.type.includes("Auto") ? "Auto-renew" : "Transfer to Current"}</span></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Recent interest income</h4>
+                            <div className="space-y-3 text-sm">
+                              {[
+                                { date: "Jul 1, 2026", amount: activeFD.balance * (parseFloat(activeFD.rate) / 100) / 12 },
+                                { date: "Jun 1, 2026", amount: activeFD.balance * (parseFloat(activeFD.rate) / 100) / 12 },
+                              ].map((txn, idx) => (
+                                <div key={idx} className="flex justify-between items-center">
+                                  <span className="text-slate-600">{txn.date}</span>
+                                  <span className="font-bold text-green-600">+{formatMoney(txn.amount, activeFD.ccy)}</span>
+                                </div>
+                              ))}
+                              <button className="w-full mt-2 py-2 text-xs font-semibold text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors border border-transparent hover:border-primary-100 flex items-center justify-center gap-1">
+                                View all history <Icon name="arrow_forward" className="text-[14px]" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-                <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-sm bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-3.5">
-                  <span className="text-slate-500">Total deposits:</span>
-                  {Object.entries(depositTotals).map(([ccy, v]) => (
-                    <span key={ccy} className="font-bold text-slate-900">{formatMoney(v, ccy as "USD" | "KHR")}</span>
-                  ))}
-                </div>
-              </div>
-            )
+                    </div>
+                  );
+                })()}
+              </Section>
+            </div>
           )}
 
           {/* --- Cards (read-only) — master/detail --- */}
@@ -1201,58 +1496,6 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* --- Interactions (read-only) --- */}
-          {tab === "Interactions" && (
-            <Section title="Interaction timeline">
-              <div className="relative pl-6">
-                <div className="absolute left-2 top-1 bottom-1 w-px bg-slate-200" />
-                {customer.interactions.map((it, i) => (
-                  <div key={i} className="relative pb-5 stagger-item" style={{ animationDelay: `${i * 70}ms` }}>
-                    <div className="absolute -left-4 top-1 w-3 h-3 rounded-full bg-primary-600 ring-4 ring-primary-50" />
-                    <div className="text-xs text-slate-400">
-                      <span className="font-semibold text-primary-600">{it.channel}</span> · {it.date}
-                    </div>
-                    <p className="text-sm text-slate-700 mt-1">{it.note}</p>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {/* --- Support cases (read-only) --- */}
-          {tab === "Support" && (
-            <Section title="Support cases">
-              {cases.length === 0 ? <EmptyState icon="support_agent" message="No support cases for this customer" /> : (
-                <>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="bg-slate-50 rounded-lg p-3 text-center"><div className="text-lg font-extrabold text-slate-900">{openCases}</div><div className="text-[11px] text-slate-400 uppercase tracking-wide">Open</div></div>
-                  <div className="bg-slate-50 rounded-lg p-3 text-center"><div className="text-lg font-extrabold text-slate-900">{cases.length - openCases}</div><div className="text-[11px] text-slate-400 uppercase tracking-wide">Resolved</div></div>
-                  <div className="bg-slate-50 rounded-lg p-3 text-center"><div className={`text-lg font-extrabold ${slaBreaches ? "text-red-600" : "text-slate-900"}`}>{slaBreaches}</div><div className="text-[11px] text-slate-400 uppercase tracking-wide">SLA breach</div></div>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {cases.map((c) => (
-                    <div key={c.id} className="py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-800">{c.subject}</div>
-                          <div className="text-xs text-slate-400 mt-0.5">{c.id} · {c.category} · opened {c.created}</div>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-none">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${c.priority === "High" ? "bg-red-100 text-red-700" : c.priority === "Medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{c.priority}</span>
-                          <Badge label={c.status} />
-                        </div>
-                      </div>
-                      <div className={`text-xs mt-1.5 ${c.slaState === "breach" ? "text-red-600" : c.slaState === "warning" ? "text-amber-600" : "text-slate-500"}`}>
-                        SLA: {c.sla} · assigned to {c.assignee}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                </>
-              )}
-            </Section>
-          )}
-
           {/* --- Security (read-only) --- */}
           {tab === "Security" && (
             <div className="space-y-5">
@@ -1278,6 +1521,399 @@ export default function Customer360Page() {
                 ))}
               </div>
             </Section>
+            </div>
+          )}
+
+          {/* --- Internet Banking (channel view) --- */}
+          {tab === "Internet Banking" && (() => {
+            const enrolled = customer.ebanking.length > 0;
+            if (!enrolled) return (
+              <div className="bg-white border border-slate-200 rounded-xl"><EmptyState icon="desktop_windows" message="Not enrolled in Internet Banking" /></div>
+            );
+            const seed = parseInt(customer.id.replace(/\D/g, "").slice(-4) || "1", 10);
+            const status = seed % 9 === 0 ? "Locked" : "Active";
+            const loginId = `${customer.name.split(" ")[0].toLowerCase()}****${customer.id.slice(-3)}`;
+            const dailyLimit = customer.segment === "Affluent" ? 20000 : hasCorp ? 50000 : 5000;
+            const entitlements = [
+              { k: "View accounts & balances", on: true },
+              { k: "Fund transfers", on: true },
+              { k: "Bill payments", on: true },
+              { k: "Beneficiary management", on: true },
+              { k: "Statement download", on: true },
+              { k: "Bulk / payroll", on: hasCorp },
+            ];
+            const sessions = [
+              { br: "Chrome · Windows", loc: `${customer.branch.split(" ")[0]} · 10.2.${seed % 254}`, when: customer.devices[0]?.lastSeen ?? "Today" },
+              ...(seed % 3 === 0 ? [{ br: "Safari · macOS", loc: `Remote · 116.212.${seed % 254}`, when: "Yesterday 18:20" }] : []),
+            ];
+            return (
+            <div className="space-y-5">
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Icon name="desktop_windows" className="text-primary-600 bg-primary-50 rounded-lg p-2 text-2xl" />
+                  <div>
+                    <div className="font-bold text-slate-900">Internet Banking</div>
+                    <div className="text-xs text-slate-400">Login ID <b className="text-slate-600 font-mono">{loginId}</b> · enrolled {formatDate(customer.joined)}</div>
+                  </div>
+                </div>
+                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${status === "Locked" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>{status}</span>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatTile label="Logins · 30d" value={20 + (seed % 40)} />
+                <StatTile label="Failed attempts" value={seed % 4} cls={seed % 4 ? "text-amber-600" : "text-slate-900"} />
+                <StatTile label="Active sessions" value={sessions.length} />
+                <StatTile label="Daily transfer limit" value={formatMoney(dailyLimit, "USD")} />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5">
+                <Section title="Feature entitlements">
+                  <div className="space-y-2">
+                    {entitlements.map((e) => (
+                      <div key={e.k} className="flex items-center justify-between text-sm"><span className="text-slate-600">{e.k}</span><OnOff on={e.on} /></div>
+                    ))}
+                  </div>
+                </Section>
+                <Section title="Transaction limits">
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-600">Per transaction</span><span className="font-semibold text-slate-800">{formatMoney(Math.round(dailyLimit / 2), "USD")}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-600">Daily</span><span className="font-semibold text-slate-800">{formatMoney(dailyLimit, "USD")}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-600">Monthly</span><span className="font-semibold text-slate-800">{formatMoney(dailyLimit * 10, "USD")}</span></div>
+                    <div className="flex justify-between border-t border-slate-100 pt-2"><span className="text-slate-600">Saved beneficiaries</span><span className="font-semibold text-slate-800">{1 + (seed % 6)}</span></div>
+                  </div>
+                </Section>
+              </div>
+
+              <Section title="Active web sessions">
+                <div className="divide-y divide-slate-100">
+                  {sessions.map((s, i) => (
+                    <div key={i} className="py-2.5 flex items-center gap-3">
+                      <Icon name="language" className="text-primary-600 bg-primary-50 rounded-lg p-1.5 text-lg flex-none" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-slate-800">{s.br}</div>
+                        <div className="text-xs text-slate-400">{s.loc} · {s.when}</div>
+                      </div>
+                      <button onClick={() => setToast({ message: "Session terminated", type: "success" })}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 px-2 py-1">Terminate</button>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+            </div>
+            );
+          })()}
+
+          {/* --- Mobile Banking (channel view) --- */}
+          {tab === "Mobile Banking" && (() => {
+            const enrolled = customer.ebanking.includes("Mobile Banking");
+            if (!enrolled) return (
+              <div className="bg-white border border-slate-200 rounded-xl"><EmptyState icon="smartphone" message="Not enrolled in Mobile Banking" /></div>
+            );
+            const seed = parseInt(customer.id.replace(/\D/g, "").slice(-4) || "1", 10);
+            const status = "Active";
+            const device = customer.devices[0];
+            const biometric = seed % 3 !== 0;
+            const push = customer.ebanking.includes("SMS Alert") || seed % 2 === 0;
+            const dailyLimit = customer.segment === "Affluent" ? 10000 : hasCorp ? 20000 : 3000;
+            const usage = [
+              { k: "KHQR payments", pct: 55 + (seed % 40) },
+              { k: "Transfers", pct: 25 + (seed % 30) },
+              { k: "Top-up & bills", pct: 10 + (seed % 25) },
+            ];
+            const logins = mobileLogins(customer.id, device?.name ?? "Device");
+            const failedLogins = logins.filter((l) => l.result !== "Success").length;
+            const foreignLogins = logins.filter((l) => l.foreign).length;
+            const mblTotalPages = Math.max(1, Math.ceil(logins.length / mblPerPage));
+            const mblPageC = Math.min(mblPage, mblTotalPages);
+            const mblStart = (mblPageC - 1) * mblPerPage;
+            const mblRows = logins.slice(mblStart, mblStart + mblPerPage);
+            return (
+            <div className="space-y-5">
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Icon name="smartphone" className="text-primary-600 bg-primary-50 rounded-lg p-2 text-2xl" />
+                  <div>
+                    <div className="font-bold text-slate-900">Mobile Banking</div>
+                    <div className="text-xs text-slate-400">App v4.8.{seed % 9} · last login {device?.lastSeen ?? "—"} ({biometric ? "biometric" : "PIN"})</div>
+                  </div>
+                </div>
+                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">{status}</span>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatTile label="Logins · 30d" value={logins.length} />
+                <StatTile label="Failed logins" value={failedLogins} cls={failedLogins ? "text-red-600" : "text-slate-900"} />
+                <StatTile label="Foreign logins" value={foreignLogins} cls={foreignLogins ? "text-amber-600" : "text-slate-900"} />
+                <StatTile label="Daily in-app limit" value={formatMoney(dailyLimit, "USD")} />
+              </div>
+
+              <Section title="Bound device">
+                <div className="flex items-center gap-3">
+                  <Icon name="phone_iphone" className="text-primary-600 bg-primary-50 rounded-lg p-2 text-2xl flex-none" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-slate-800">{device?.name ?? "—"}</div>
+                    <div className="text-xs text-slate-400">Bound to {customer.phone} · last seen {device?.lastSeen ?? "—"}</div>
+                  </div>
+                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${device?.trusted ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{device?.trusted ? "Trusted" : "Pending"}</span>
+                  <button onClick={() => setToast({ message: "Device de-registered — customer must re-bind", type: "info" })}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700 px-2 py-1">De-register</button>
+                </div>
+              </Section>
+
+              <div className="grid md:grid-cols-2 gap-5">
+                <Section title="Authentication & alerts">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between"><span className="text-slate-600">Biometric login</span><OnOff on={biometric} /></div>
+                    <div className="flex items-center justify-between"><span className="text-slate-600">PIN / passcode</span><OnOff on={true} /></div>
+                    <div className="flex items-center justify-between"><span className="text-slate-600">Push notifications</span><OnOff on={push} /></div>
+                    <div className="flex items-center justify-between"><span className="text-slate-600">SMS alerts</span><OnOff on={customer.ebanking.includes("SMS Alert")} /></div>
+                    <div className="flex items-center justify-between"><span className="text-slate-600">Single-device binding</span><OnOff on={true} /></div>
+                  </div>
+                </Section>
+                <Section title="Feature usage · 30d">
+                  <div className="space-y-3">
+                    {usage.map((u) => (
+                      <div key={u.k}>
+                        <div className="flex justify-between text-sm mb-1"><span className="text-slate-600">{u.k}</span><span className="font-semibold text-slate-700">{Math.min(99, u.pct)}%</span></div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-gold rounded-full" style={{ width: `${Math.min(99, u.pct)}%` }} /></div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm border-t border-slate-100 pt-2"><span className="text-slate-600">Daily in-app limit</span><span className="font-semibold text-slate-800">{formatMoney(dailyLimit, "USD")}</span></div>
+                  </div>
+                </Section>
+              </div>
+
+              <Section title="Login history & location">
+                <div className="divide-y divide-slate-100">
+                  {mblRows.map((l) => (
+                    <div key={l.id} className="py-2.5 flex items-center gap-3">
+                      <Icon name={l.foreign ? "travel_explore" : "location_on"} className={`rounded-lg p-1.5 text-lg flex-none ${l.foreign ? "text-amber-600 bg-amber-50" : "text-primary-600 bg-primary-50"}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-slate-800 truncate">
+                          {l.city}
+                          {l.foreign && <span className="ml-2 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">Foreign</span>}
+                        </div>
+                        <div className="text-xs text-slate-400 truncate">{l.method} · {l.device} · IP {l.ip}</div>
+                      </div>
+                      <div className="text-right flex-none">
+                        <div className="text-xs text-slate-500 whitespace-nowrap">{l.ts}</div>
+                        <span className={`text-[10px] font-semibold ${l.result === "Success" ? "text-green-600" : l.result === "Blocked" ? "text-red-600" : "text-amber-600"}`}>{l.result}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-1 border-t border-slate-100 text-sm">
+                  <div className="text-slate-500">Showing {mblStart + 1}–{Math.min(mblStart + mblPerPage, logins.length)} of {logins.length} logins</div>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-slate-500">
+                      <span className="whitespace-nowrap">Rows per page</span>
+                      <select value={mblPerPage} onChange={(e) => { setMblPerPage(Number(e.target.value)); setMblPage(1); }}
+                        className="border border-slate-300 rounded-lg pl-3 pr-8 py-1.5 text-sm text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600">
+                        {[6, 12, 24].map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button disabled={mblPageC <= 1} onClick={() => setMblPage(mblPageC - 1)} className={`px-2.5 py-1 rounded-md ${mblPageC <= 1 ? "text-slate-300" : "text-slate-600 hover:bg-slate-100"}`}>Previous</button>
+                      <span className="text-slate-500">Page {mblPageC} of {mblTotalPages}</span>
+                      <button disabled={mblPageC >= mblTotalPages} onClick={() => setMblPage(mblPageC + 1)} className={`px-2.5 py-1 rounded-md ${mblPageC >= mblTotalPages ? "text-slate-300" : "text-slate-600 hover:bg-slate-100"}`}>Next</button>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+
+            </div>
+            );
+          })()}
+
+          {/* --- Audit Logs (read-only, immutable) --- */}
+          {tab === "Audit Logs" && (() => {
+            const logs = buildAuditLogs(customer.id);
+            const audFiltering = !!(audQ || audCat !== "All" || audActor !== "All" || audResult !== "All" || audFrom || audTo);
+            const rows = logs.filter((l) => {
+              const cOk = audCat === "All" || l.category === audCat;
+              const aOk = audActor === "All" || l.actor === audActor;
+              const rOk = audResult === "All" || l.result === audResult;
+              const q = audQ.trim().toLowerCase();
+              const qOk = !q || (l.action + " " + l.actor + " " + l.id + " " + (l.field ?? "")).toLowerCase().includes(q);
+              const fOk = !audFrom || l.date >= audFrom;
+              const tOk = !audTo || l.date <= audTo;
+              return cOk && aOk && rOk && qOk && fOk && tOk;
+            });
+            const totalPages = Math.max(1, Math.ceil(rows.length / audPerPage));
+            const pageC = Math.min(audPage, totalPages);
+            const start = (pageC - 1) * audPerPage;
+            const pageRows = rows.slice(start, start + audPerPage);
+            const summary = {
+              total: logs.length,
+              profile: logs.filter((l) => l.category === "Profile").length,
+              access: logs.filter((l) => l.category === "Access").length,
+              security: logs.filter((l) => l.category === "Security").length,
+              failed: logs.filter((l) => l.result === "Failed").length,
+            };
+            const actors = ["All", ...Array.from(new Set(logs.map((l) => l.actor)))];
+            const resultPill = (r: string) => r === "Failed" ? "bg-red-100 text-red-700" : r === "Pending" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700";
+            const exportCsv = () => {
+              const head = ["Timestamp", "Actor", "Role", "Category", "Action", "Field", "Before", "After", "Source", "Result"];
+              const csv = [head.join(","), ...rows.map((r) => [r.ts, r.actor, r.role, r.category, r.action, r.field ?? "", r.before ?? "", r.after ?? "", r.source, r.result]
+                .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+              const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+              const a = document.createElement("a"); a.href = url; a.download = `audit-log-${customer.id}.csv`; a.click();
+              URL.revokeObjectURL(url);
+              setToast({ message: `Exported ${rows.length} audit entries (CSV)`, type: "success" });
+            };
+            return (
+            <div className="space-y-5">
+              {/* Summary strip */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                {[
+                  ["Total events", summary.total, "text-slate-900"],
+                  ["Profile changes", summary.profile, "text-slate-900"],
+                  ["Data access", summary.access, "text-slate-900"],
+                  ["Security", summary.security, "text-slate-900"],
+                  ["Failed", summary.failed, summary.failed ? "text-red-600" : "text-slate-900"],
+                ].map(([label, val, cls]) => (
+                  <div key={label as string} className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
+                    <div className={`text-xl font-extrabold mt-1 ${cls}`}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-sm">Audit trail</h3>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400"><Icon name="lock" className="text-sm" />Read-only · immutable</span>
+                  </div>
+                  <button onClick={exportCsv} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50">
+                    <Icon name="download" className="text-base" />Export
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3">
+                  <div className="relative w-44">
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
+                    <input value={audQ} onChange={(e) => { setAudQ(e.target.value); setAudPage(1); }} placeholder="Search…"
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
+                  </div>
+                  <select value={audCat} onChange={(e) => { setAudCat(e.target.value); setAudPage(1); }}
+                    className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+                    {AUDIT_CATEGORIES.map((c) => <option key={c} value={c}>{c === "All" ? "All categories" : c}</option>)}
+                  </select>
+                  <select value={audActor} onChange={(e) => { setAudActor(e.target.value); setAudPage(1); }}
+                    className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+                    {actors.map((a) => <option key={a} value={a}>{a === "All" ? "All actors" : a}</option>)}
+                  </select>
+                  <select value={audResult} onChange={(e) => { setAudResult(e.target.value); setAudPage(1); }}
+                    className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+                    {["All", "Success", "Failed", "Pending"].map((s) => <option key={s} value={s}>{s === "All" ? "All results" : s}</option>)}
+                  </select>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-xs font-medium text-slate-500">From</span>
+                    <input type="date" value={audFrom} onChange={(e) => { setAudFrom(e.target.value); setAudPage(1); }}
+                      className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
+                    <span className="text-xs font-medium text-slate-500">To</span>
+                    <input type="date" value={audTo} onChange={(e) => { setAudTo(e.target.value); setAudPage(1); }}
+                      className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
+                  </div>
+                  {audFiltering && (
+                    <button onClick={() => { setAudQ(""); setAudCat("All"); setAudActor("All"); setAudResult("All"); setAudFrom(""); setAudTo(""); setAudPage(1); }}
+                      className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800">
+                      <Icon name="close" className="text-base" />Clear
+                    </button>
+                  )}
+                </div>
+
+                {rows.length === 0 ? (
+                  <EmptyState icon="history" message="No audit events match your filters" />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Timestamp</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Actor</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Category</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Action</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Result</th>
+                          <th className="px-4 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {pageRows.map((l) => {
+                          const open = audOpen === l.id;
+                          return (
+                            <React.Fragment key={l.id}>
+                              <tr onClick={() => setAudOpen(open ? null : l.id)} className="hover:bg-slate-50 cursor-pointer">
+                                <td className="px-4 py-3 text-slate-500 whitespace-nowrap font-mono text-xs">{l.ts}</td>
+                                <td className="px-4 py-3 hidden md:table-cell">
+                                  <div className="font-medium text-slate-800">{l.actor}</div>
+                                  <div className="text-xs text-slate-400">{l.role}</div>
+                                </td>
+                                <td className="px-4 py-3 hidden lg:table-cell">
+                                  <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600">{l.category}</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium text-slate-800">{l.action}</span>
+                                    {l.sensitive && <span title="Sensitive action"><Icon name="flag" className="text-amber-500 text-base" /></span>}
+                                  </div>
+                                  {l.field && <div className="text-xs text-slate-400 font-mono">{l.field}</div>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${resultPill(l.result)}`}>{l.result}</span>
+                                </td>
+                                <td className="px-4 py-3 text-right"><Icon name={open ? "expand_less" : "expand_more"} className="text-slate-400" /></td>
+                              </tr>
+                              {open && (
+                                <tr className="bg-slate-50/60">
+                                  <td colSpan={6} className="px-4 py-3">
+                                    <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                                      {l.before != null && <div><span className="text-slate-400 text-xs">Before</span><div className="font-medium text-slate-700">{l.before}</div></div>}
+                                      {l.after != null && <div><span className="text-slate-400 text-xs">After</span><div className="font-medium text-slate-700">{l.after}</div></div>}
+                                      <div><span className="text-slate-400 text-xs">Actor</span><div className="font-medium text-slate-700">{l.actor} · {l.role} ({l.actorId})</div></div>
+                                      <div><span className="text-slate-400 text-xs">Source</span><div className="font-medium text-slate-700">{l.source}</div></div>
+                                      <div><span className="text-slate-400 text-xs">Reference</span><div className="font-mono text-xs text-slate-700">{l.id}</div></div>
+                                      <div><span className="text-slate-400 text-xs">Category</span><div className="font-medium text-slate-700">{l.category}</div></div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-sm">
+                      <div className="text-slate-500">Showing {start + 1}–{Math.min(start + audPerPage, rows.length)} of {rows.length} events</div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-slate-500">
+                          <span className="whitespace-nowrap">Rows per page</span>
+                          <select value={audPerPage} onChange={(e) => { setAudPerPage(Number(e.target.value)); setAudPage(1); }}
+                            className="border border-slate-300 rounded-lg pl-3 pr-8 py-1.5 text-sm text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600">
+                            {[8, 15, 30].map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button disabled={pageC <= 1} onClick={() => setAudPage(pageC - 1)} className={`px-2.5 py-1 rounded-md ${pageC <= 1 ? "text-slate-300" : "text-slate-600 hover:bg-slate-100"}`}>Previous</button>
+                          <span className="text-slate-500">Page {pageC} of {totalPages}</span>
+                          <button disabled={pageC >= totalPages} onClick={() => setAudPage(pageC + 1)} className={`px-2.5 py-1 rounded-md ${pageC >= totalPages ? "text-slate-300" : "text-slate-600 hover:bg-slate-100"}`}>Next</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            );
+          })()}
+
+          {/* --- Tabs added to nav; detailed content not built yet --- */}
+          {PLACEHOLDER_TABS.includes(tab) && (
+            <div className="bg-white border border-slate-200 rounded-xl">
+              <EmptyState icon="construction" message={`${tab} — coming soon`} />
             </div>
           )}
         </div>

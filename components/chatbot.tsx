@@ -44,7 +44,7 @@ function respond(text: string): string {
   if (/edit|change|update|modify|\bsave\b|delete|create service/.test(q))
     return "This CRM is view-only for relationship officers — you can't edit customer or product data here. Edits happen in core banking; new customers arrive via the Mobile eKYC app.";
   if (/360|profile|detail/.test(q))
-    return "Customers → click a row to open Customer 360°: identity, product holdings, services in use, plus read-only tabs for Accounts, Deposits, Cards, Loans, Investments, Insurances, Interactions and Security.";
+    return "Customers → click a row to open Customer 360°: identity, product holdings, services in use, plus tabs for Accounts, Payments, Fixed Deposits, Cards, Loans, Investments, Insurances and Security.";
   if (/overview|dashboard|segment|adoption|portfolio/.test(q))
     return "The Overview is your portfolio lens: relationship KPIs, service adoption across your whole book, segment mix, cross-sell opportunities and top relationships by value.";
   if (/how many customers|total customer/.test(q))
