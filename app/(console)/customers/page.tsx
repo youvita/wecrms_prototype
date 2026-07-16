@@ -131,7 +131,7 @@ export default function CustomersPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {pageRows.map((c, i) => (
-                  <tr key={c.id} onClick={() => router.push(`/customers/${c.id}`)}
+                  <tr key={c.id} data-href={`/customers/${c.id}`} onClick={() => router.push(`/customers/${c.id}`)}
                     className="hover:bg-primary-50/40 transition-colors cursor-pointer stagger-item" style={{ animationDelay: `${i * 40}ms` }}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">

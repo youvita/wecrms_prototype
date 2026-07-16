@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "preview:static": "next build --webpack && node scripts/build-preview.js"
   },
   "dependencies": {
     "next": "^16.2.10",
