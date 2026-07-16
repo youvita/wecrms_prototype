@@ -8,6 +8,10 @@
 body {
   font-family: 'Inter', 'Noto Sans Khmer', -apple-system, BlinkMacSystemFont, sans-serif;
   font-feature-settings: "tnum"; /* tabular numerals for data tables */
+  /* Uniform app-wide enlargement — scales ALL sizes (rem + fixed px) by the same
+     factor, so text, spacing, and micro-labels grow together. Bump this one value
+     to zoom the whole project (1 = default, 1.3 ≈ +30%). */
+  zoom: 1.3;
 }
 
 .material-symbols-outlined {

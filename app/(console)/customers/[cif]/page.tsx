@@ -9,7 +9,7 @@ import { AiPanel, Badge, EmptyState, Icon, Toast, type ToastMsg } from "@/compon
 import type { Customer, CorporateFacet, Investment, Insurance, GiftTransaction, LocationEvent, CycleStatus, CreditAccount, AtmActivity, AtmResult, CallActivity, CallStatus, Complaint, ComplaintStatus, ComplaintPriority, MiniAppSession, MiniAppStatus, MiniAppInvestigationFlag, SalesActivity, SalesStage, IbActivity, IbEventType, IbOutcome, MbActivity, MbEventType, GeneratedReport, ReportPackKey, ReportFormat, ReportStatus } from "@/lib/types";
 
 const TABS = [
-  "Overviews", "Customer Information", "Accounts", "Payments", "Fixed Deposits", "Cards", "Loans", "Investments", "Insurances",
+  "Overviews", "Customer Information", "Accounts", "Bill Payments", "Fixed Deposits", "Cards", "Loans", "Investments", "Insurances",
   "Locations", "Sales Activities", "Call Center", "Compliance", "CBC", "Reminder", "Merchants",
   "Internet Banking", "Mobile Banking", "Cash ATM", "Mini App", "Gift Zone", "Loyalty Points", "Reports", "Security", "Audit Logs",
 ] as const;
@@ -17,7 +17,6 @@ const TABS = [
 // Tabs added to the navigation but whose detailed content is not built yet.
 const PLACEHOLDER_TABS: readonly string[] = [];
 const AUDIT_CATEGORIES = ["All", "Profile", "Access", "Servicing", "Consent & docs", "Security", "Approvals"];
-const TXN_CHANNELS = ["All", "KHQR", "Bakong", "Transfer", "Bill"] as const;
 type Tab = (typeof TABS)[number];
 
 function Section({ title, children, action }: { title: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
@@ -42,25 +41,84 @@ function Info({ label, value, span }: { label: string; value: string; span?: boo
 }
 
 // Loan detail card: a titled white card with a label/value list; one row may be highlighted.
-function LoanDetailCard({ title, rows }: { title: string; rows: { label: string; value: string; highlight?: boolean }[] }) {
+// Reminder tab — unified notification row + per-type visual meta.
+type ReminderRow = {
+  id: string; type: "alert" | "transaction" | "announcement"; subject: string; details: string;
+  priority: "High" | "Medium" | "Low"; assignedTo: string; time: string;
+  statusLabel: string; statusColorClass: string;
+};
+const REMINDER_TYPE_META: Record<ReminderRow["type"], { icon: string; iconColorClass: string; borderColorClass: string }> = {
+  alert: { icon: "error_outline", iconColorClass: "text-rose-500", borderColorClass: "border-l-2 border-rose-400" },
+  transaction: { icon: "swap_horiz", iconColorClass: "text-blue-500", borderColorClass: "border-l-2 border-blue-400" },
+  announcement: { icon: "campaign", iconColorClass: "text-purple-500", borderColorClass: "border-l-2 border-purple-400" },
+};
+const REMINDER_FILTER_MAP: Record<string, string> = { All: "All", Alerts: "alert", Transactions: "transaction", Announcements: "announcement" };
+
+// Brand logo tile for mini-app providers. External company marks are recreated in their
+// real brand colors (a deliberate exception to the app palette), falling back to a neutral
+// category icon for any unrecognized mini app.
+function MiniAppLogo({ name, category }: { name: string; category: string }) {
+  const n = name.toLowerCase();
+  const cls = "w-8 h-8 rounded-lg flex items-center justify-center flex-none";
+  if (n.includes("edc") || n.includes("electric"))
+    return <span className={`${cls} bg-[#1b4f9c] text-white text-[10px] font-black tracking-tight`} aria-label="EDC">EDC</span>;
+  if (n.includes("redbus") || n.includes("bus"))
+    return <span className={`${cls} bg-[#d84e55] text-white`} aria-label="redBus"><Icon name="directions_bus" className="text-lg" /></span>;
+  if (n.includes("smart") || n.includes("5g"))
+    return <span className={`${cls} bg-[#00a94f] text-white text-[11px] font-black`} aria-label="Smart 5G">5G</span>;
+  if (n.includes("angkor"))
+    return <span className={`${cls} bg-black text-[#f5a623]`} aria-label="Angkor DC"><Icon name="movie" className="text-lg" /></span>;
+  const catIcon = category === "Bill Payment" ? "receipt_long" : category === "Travel" ? "flight" : category === "Mobile Top-up" ? "smartphone" : category === "Entertainment" ? "movie" : category === "Insurance" ? "shield" : "widgets";
+  return <span className={`${cls} bg-slate-100 text-slate-500`}><Icon name={catIcon} className="text-lg" /></span>;
+}
+
+// Brand/asset logo tile for investment holdings. CSX is recreated as its navy brand mark
+// (no orange surround); other holding types fall back to a neutral icon tile.
+function InvestmentLogo({ type }: { type: string }) {
+  const cls = "w-8 h-8 rounded-lg flex items-center justify-center flex-none";
+  const t = type.toLowerCase();
+  if (t.includes("csx") || t.includes("securit"))
+    return <span className={`${cls} bg-[#1b2f5e] text-gold text-[10px] font-black tracking-tight`} aria-label="CSX Securities">CSX</span>;
+  if (t.includes("bond"))
+    return <span className={`${cls} bg-slate-100 text-slate-500`}><Icon name="account_balance" className="text-lg" /></span>;
+  return <span className={`${cls} bg-slate-100 text-slate-500`}><Icon name="trending_up" className="text-lg" /></span>;
+}
+
+// Insurer logo tile for policies. Recreated as the Forte Insurance brand mark (brand blue),
+// with a product-specific icon per policy type.
+function InsuranceLogo({ policy }: { policy: string }) {
+  const cls = "w-8 h-8 rounded-lg flex items-center justify-center flex-none bg-[#0072bc] text-white";
+  const p = policy.toLowerCase();
+  const icon = p.includes("auto") || p.includes("motor") || p.includes("vehicle") ? "directions_car"
+    : p.includes("life") || p.includes("protect") || p.includes("health") ? "health_and_safety"
+    : "shield";
+  return <span className={cls} aria-label="Forte Insurance"><Icon name={icon} className="text-lg" /></span>;
+}
+
+// A single loan card with one or more titled sections (each a header bar + rows).
+function LoanDetailCard({ sections }: { sections: { title: string; rows: { label: string; value: string; highlight?: boolean }[] }[] }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-      <h4 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">{title}</h4>
-      <dl>
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className={row.highlight
-              ? "-mx-2 mt-1 flex items-center justify-between gap-4 rounded-lg bg-amber-50 px-2 py-3"
-              : "flex items-center justify-between gap-4 py-2"}
-          >
-            <dt className="text-sm text-slate-500">{row.label}</dt>
-            <dd className={row.highlight
-              ? "m-0 text-base font-bold text-amber-700"
-              : "m-0 text-sm font-semibold text-slate-800"}>{row.value}</dd>
-          </div>
-        ))}
-      </dl>
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      {sections.map((sec, si) => (
+        <div key={sec.title}>
+          <h4 className={`text-sm font-bold text-slate-900 bg-slate-50 px-5 py-2.5 border-b border-slate-100 ${si > 0 ? "border-t" : ""}`}>{sec.title}</h4>
+          <dl className="px-5 py-1">
+            {sec.rows.map((row) => (
+              <div
+                key={row.label}
+                className={row.highlight
+                  ? "-mx-2 my-1 flex items-center justify-between gap-4 rounded-lg bg-amber-50 px-2 py-3"
+                  : "flex items-center justify-between gap-4 py-2"}
+              >
+                <dt className="text-sm text-slate-500">{row.label}</dt>
+                <dd className={row.highlight
+                  ? "m-0 text-base font-bold text-amber-700"
+                  : "m-0 text-sm font-semibold text-slate-800"}>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
     </div>
   );
 }
@@ -393,7 +451,9 @@ function CallDrawer({ record, onClose, onEdit }: { record: CallActivity; onClose
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-100 sticky top-0 bg-white">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Call Center · {record.id}</div>
-            <h3 className="text-base font-bold text-slate-900 mt-0.5">{record.record}</h3>
+            <h3 className="text-base font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+              <Icon name="support_agent" className="text-slate-400 text-lg flex-none" />{record.record}
+            </h3>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             <Icon name="close" className="text-lg" />
@@ -516,27 +576,27 @@ function CallForm({ mode, initial, customerId, nextId, updatedBy, defaultPhone, 
 
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Call reason</label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="support_agent" className="text-sm text-slate-400" />Call reason</label>
             <input value={record} onChange={(e) => setRecord(e.target.value)} placeholder="e.g. Card blocked inquiry" className={cls} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Call date</label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="event" className="text-sm text-slate-400" />Call date</label>
             <input type="datetime-local" value={dateISO} onChange={(e) => setDateISO(e.target.value)} className={cls} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Duration</label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="timer" className="text-sm text-slate-400" />Duration</label>
             <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="e.g. 4m 12s" className={cls} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Agent</label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="badge" className="text-sm text-slate-400" />Agent</label>
             <input value={agent} onChange={(e) => setAgent(e.target.value)} className={cls} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Phone</label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="call" className="text-sm text-slate-400" />Phone</label>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} className={cls} />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Voice record file <span className="font-normal text-slate-400">· optional</span></label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="graphic_eq" className="text-sm text-slate-400" />Voice record file <span className="font-normal text-slate-400">· optional</span></label>
             <div className="flex items-center gap-2">
               <label className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
                 <Icon name="upload_file" className="text-base" />Choose file
@@ -550,7 +610,7 @@ function CallForm({ mode, initial, customerId, nextId, updatedBy, defaultPhone, 
             <p className="mt-1 text-xs text-slate-400">Select an audio file from your device.</p>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-500 mb-1">Call summary</label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1"><Icon name="notes" className="text-sm text-slate-400" />Call summary</label>
             <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} className={cls} />
           </div>
           {err && <div className="sm:col-span-2 text-sm text-red-600">{err}</div>}
@@ -1568,42 +1628,44 @@ function cardTxns(no: string) {
   });
 }
 
-// Deterministic per-customer payment history — the real mock TRANSACTIONS are sparse
-// (1–2 per customer), so we synthesize a fuller 30-day statement for the Payments tab.
-type PayRow = { id: string; date: string; time: string; type: string; channel: string; counterparty: string; amount: number; ccy: "USD" | "KHR"; status: string };
-const PAY_TEMPLATES: { type: string; channel: string; cp: string; base: number; ccy: "USD" | "KHR" }[] = [
-  { type: "KHQR Payment", channel: "KHQR", cp: "Brown Coffee — BKK1", base: -12.5, ccy: "USD" },
-  { type: "KHQR Payment", channel: "KHQR", cp: "Lucky Supermarket", base: -38, ccy: "USD" },
-  { type: "Bakong Transfer", channel: "Bakong", cp: "→ Wing (012 345 678)", base: -25, ccy: "USD" },
-  { type: "Bill Payment", channel: "Bill", cp: "EDC Electricity", base: -85000, ccy: "KHR" },
-  { type: "Mobile Top-up", channel: "Bill", cp: "Smart Axiata", base: -5, ccy: "USD" },
-  { type: "Interbank Transfer", channel: "Transfer", cp: "→ ACLEDA ••3391", base: -120, ccy: "USD" },
-  { type: "Fund Transfer In", channel: "Transfer", cp: "← ABA ••8842", base: 300, ccy: "USD" },
-  { type: "Salary Credit", channel: "Transfer", cp: "Monthly payroll", base: 900, ccy: "USD" },
+// Per-customer bill-payment history for the Bill Payments tab.
+type PayRow = { id: string; date: string; time: string; type: string; channel: string; counterparty: string; amount: number; ccy: "USD" | "KHR"; status: string; category?: string };
+
+// Bill Payments tab — a focused, bill-only 30-day statement (utilities, telecom,
+// internet, TV, insurance, tuition). All entries are debits (money out).
+const BILL_CATEGORIES = ["Utilities", "Telecom", "Internet", "TV", "Insurance", "Education"] as const;
+const BILL_TEMPLATES: { type: string; category: string; cp: string; base: number; ccy: "USD" | "KHR" }[] = [
+  { type: "Electricity bill", category: "Utilities", cp: "EDC — Électricité du Cambodge", base: -85000, ccy: "KHR" },
+  { type: "Water bill", category: "Utilities", cp: "Phnom Penh Water Authority", base: -32000, ccy: "KHR" },
+  { type: "Mobile top-up", category: "Telecom", cp: "Smart Axiata", base: -5, ccy: "USD" },
+  { type: "Mobile postpaid", category: "Telecom", cp: "Cellcard", base: -12, ccy: "USD" },
+  { type: "Home internet", category: "Internet", cp: "Metfone Fiber", base: -18, ccy: "USD" },
+  { type: "Fiber internet", category: "Internet", cp: "Ezecom", base: -22, ccy: "USD" },
+  { type: "TV subscription", category: "TV", cp: "One TV Cambodia", base: -8, ccy: "USD" },
+  { type: "Insurance premium", category: "Insurance", cp: "Forte Insurance", base: -42, ccy: "USD" },
+  { type: "Tuition fee", category: "Education", cp: "iCAN International School", base: -350, ccy: "USD" },
 ];
-function buildPayments(name: string, cif: string): PayRow[] {
+const BILL_CATEGORY_ICON: Record<string, string> = {
+  Utilities: "bolt", Telecom: "smartphone", Internet: "wifi", TV: "tv", Insurance: "shield", Education: "school",
+};
+function buildBillPayments(cif: string): PayRow[] {
   const seed = parseInt(cif.replace(/\D/g, "").slice(-4) || "1", 10);
-  const real: PayRow[] = TRANSACTIONS.filter((t) => t.customer === name).map((t) => ({
-    id: t.id, date: "2026-07-15", time: t.time, type: t.type, channel: t.channel,
-    counterparty: t.counterparty, amount: t.amount, ccy: t.ccy, status: t.status,
-  }));
-  const count = 16 + (seed % 8);
+  const count = 14 + (seed % 8);
   const base = new Date("2026-07-15");
-  const gen: PayRow[] = Array.from({ length: count }, (_, i) => {
-    const tpl = PAY_TEMPLATES[(seed + i) % PAY_TEMPLATES.length];
+  return Array.from({ length: count }, (_, i) => {
+    const tpl = BILL_TEMPLATES[(seed + i) % BILL_TEMPLATES.length];
     const d = new Date(base); d.setDate(base.getDate() - ((i % 15) * 2) - 1); // within ~30 days
     const mult = 1 + ((seed + i * 7) % 60) / 100;
     const raw = tpl.base * mult;
     const amount = tpl.ccy === "KHR" ? Math.round(raw / 500) * 500 : Math.round(raw * 100) / 100;
     return {
-      id: `TXN-${seed}${String(i).padStart(2, "0")}`,
+      id: `BILL-${seed}${String(i).padStart(2, "0")}`,
       date: d.toISOString().slice(0, 10),
       time: `${String(8 + (i % 11)).padStart(2, "0")}:${String((seed * 7 + i * 13) % 60).padStart(2, "0")}`,
-      type: tpl.type, channel: tpl.channel, counterparty: tpl.cp, amount, ccy: tpl.ccy,
+      type: tpl.type, channel: "Bill", counterparty: tpl.cp, amount, ccy: tpl.ccy, category: tpl.category,
       status: i % 11 === 4 ? "Reversed" : "Success",
     };
-  });
-  return [...real, ...gen].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.time < b.time ? 1 : -1));
+  }).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.time < b.time ? 1 : -1));
 }
 
 // Deterministic staff/system audit trail for a customer record (read-only, immutable).
@@ -1786,6 +1848,10 @@ export default function Customer360Page() {
   const [callEdits, setCallEdits] = React.useState<Record<string, CallActivity>>({}); // local edits by id
   const [callSeq, setCallSeq] = React.useState(783);
   const [callRefreshedAt, setCallRefreshedAt] = React.useState("Jul 16, 2026 - 11:30 AM");
+  // Reminder tab — inline send form, type filter, and locally sent reminders.
+  const [reminderForm, setReminderForm] = React.useState({ type: "", subject: "", body: "" });
+  const [reminderFilter, setReminderFilter] = React.useState("All");
+  const [reminderAdded, setReminderAdded] = React.useState<ReminderRow[]>([]);
   const [cmpQ, setCmpQ] = React.useState("");                 // Compliance: search + filters + paging
   const [cmpStatus, setCmpStatus] = React.useState("All");
   const [cmpFrom, setCmpFrom] = React.useState("");
@@ -1831,7 +1897,6 @@ export default function Customer360Page() {
   const [ibSelected, setIbSelected] = React.useState<IbActivity | null>(null); // open detail drawer
   const [ibRefreshedAt, setIbRefreshedAt] = React.useState("Jul 16, 2026 - 11:30 AM");
   const [selectedAccountHistory, setSelectedAccountHistory] = React.useState<string | null>(null); // Accounts: focused account no.
-  const [hoveredSlice, setHoveredSlice] = React.useState<number | null>(null); // Accounts: donut hover
   const [txnsLimit, setTxnsLimit] = React.useState(10); // Accounts: recent transactions shown
 
   // Close the Gift Zone detail modal on Escape.
@@ -1888,16 +1953,9 @@ export default function Customer360Page() {
   const custTxns = TRANSACTIONS.filter((t) => t.customer === customer.name);
   const lifecycle = custTxns.length === 0 ? "Dormant" : custTxns.length >= 3 ? "Active" : "Low activity";
 
-  // Payments tab — full statement, summary and channel mix.
-  const payments = buildPayments(customer.name, customer.id);
-  const payIn = payments.filter((t) => t.amount > 0).reduce((s, t) => s + usd(t.amount, t.ccy), 0);
-  const payOut = payments.filter((t) => t.amount < 0).reduce((s, t) => s + usd(Math.abs(t.amount), t.ccy), 0);
+  // Bill Payments tab — focused, bill-only 30-day statement.
+  const payments = buildBillPayments(customer.id);
 
-  // Goal-based savings (Deposits capability) — synthesized demo goal for savers.
-  const savingsBal = customer.accounts.filter((a) => a.type.startsWith("Savings")).reduce((s, a) => s + usd(a.balance, a.ccy), 0);
-  const goalName = customer.segment === "Affluent" ? "Property downpayment" : customer.segment === "SME" ? "Business expansion fund" : "Emergency fund";
-  const goalTarget = Math.max(2000, Math.round((savingsBal * 1.6) / 500) * 500);
-  const goalPct = goalTarget ? Math.min(100, Math.round((savingsBal / goalTarget) * 100)) : 0;
   const paymentCount = TRANSACTIONS.filter((t) => t.customer === customer.name).length;
 
   // What this customer is currently using — the CRM "know" view.
@@ -2082,21 +2140,24 @@ export default function Customer360Page() {
                     ) : (
                       <div className="space-y-4">
                         {([
-                          { title: "Accounts", icon: "account_balance_wallet", items: casaAccounts.map((a) => acctLabel(a.type, a.ccy)) },
-                          { title: "Fixed Deposits", icon: "lock_clock", items: termDeposits.map((a) => acctLabel(a.type, a.ccy)) },
-                          { title: "Cards", icon: "credit_card", items: customer.cards.map((cd) => cd.type) },
-                          { title: "Loans", icon: "account_balance", items: customer.loans.map((l) => l.product) },
-                          { title: "Investments", icon: "trending_up", items: customer.investments.map((iv) => iv.type) },
-                          { title: "Insurance", icon: "shield", items: customer.insurance.map((p) => p.policy) },
-                        ] as const).filter((g) => g.items.length > 0).map((g) => (
+                          { title: "Accounts", icon: "account_balance_wallet", items: casaAccounts.map((a) => ({ label: acctLabel(a.type, a.ccy), value: formatMoney(a.balance, a.ccy) })) },
+                          { title: "Fixed Deposits", icon: "lock_clock", items: termDeposits.map((a) => ({ label: acctLabel(a.type, a.ccy), value: formatMoney(a.balance, a.ccy) })) },
+                          { title: "Cards", icon: "credit_card", items: customer.cards.map((cd) => ({ label: cd.type, value: cd.no })) },
+                          { title: "Loans", icon: "account_balance", items: customer.loans.map((l) => ({ label: l.product, value: `${formatMoney(l.outstanding, l.ccy)} due` })) },
+                          { title: "Investments", icon: "trending_up", items: customer.investments.map((iv) => ({ label: iv.type, value: formatMoney(iv.value, "USD") })) },
+                          { title: "Insurance", icon: "shield", items: customer.insurance.map((p) => ({ label: p.policy, value: p.premium })) },
+                        ]).filter((g) => g.items.length > 0).map((g) => (
                           <div key={g.title}>
-                            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">
                               <Icon name={g.icon} className="text-sm" />{g.title}
-                              <span className="text-slate-300 font-semibold">{g.items.length}</span>
+                              <span className="ml-auto text-slate-300 font-semibold">{g.items.length}</span>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {g.items.map((label, i) => (
-                                <span key={i} className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">{label}</span>
+                            <div className="divide-y divide-slate-100">
+                              {g.items.map((it, i) => (
+                                <div key={i} className="flex items-center justify-between gap-3 py-1.5">
+                                  <span className="text-sm text-slate-700 truncate">{it.label}</span>
+                                  <span className="text-sm font-semibold text-slate-900 whitespace-nowrap flex-none">{it.value}</span>
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -2486,66 +2547,70 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* --- Payments / transaction statement (read-only) --- */}
-          {tab === "Payments" && (() => {
+          {/* --- Bill Payments — bill-only statement (read-only) --- */}
+          {tab === "Bill Payments" && (() => {
             const payFiltering = !!(payQ || payStatus !== "All" || payFrom || payTo || actCh !== "All");
             const rows = payments.filter((t) => {
-              const chOk = actCh === "All" || t.channel === actCh;
+              const catOk = actCh === "All" || t.category === actCh;
               const stOk = payStatus === "All" || t.status === payStatus;
               const q = payQ.trim().toLowerCase();
               const qOk = !q || (t.counterparty + " " + t.type + " " + t.id).toLowerCase().includes(q);
               const fOk = !payFrom || t.date >= payFrom;
               const tOk = !payTo || t.date <= payTo;
-              return chOk && stOk && qOk && fOk && tOk;
+              return catOk && stOk && qOk && fOk && tOk;
             });
             const totalPages = Math.max(1, Math.ceil(rows.length / payPerPage));
             const pageC = Math.min(payPage, totalPages);
             const start = (pageC - 1) * payPerPage;
             const pageRows = rows.slice(start, start + payPerPage);
-            const net = payIn - payOut;
+            const paid = payments.filter((t) => t.status !== "Reversed");
+            const totalPaid = paid.reduce((s, t) => s + usd(Math.abs(t.amount), t.ccy), 0);
+            const avgPerBill = paid.length ? totalPaid / paid.length : 0;
+            const billerCount = new Set(payments.map((t) => t.counterparty)).size;
             return (
             <div className="space-y-5">
               {/* Summary tiles */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Money in</div>
-                  <div className="text-xl font-extrabold text-green-600 mt-1">{formatMoney(Math.round(payIn), "USD")}</div>
-                  <div className="text-xs text-slate-400 mt-1">Credits (USD)</div>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Money out</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{formatMoney(Math.round(payOut), "USD")}</div>
-                  <div className="text-xs text-slate-400 mt-1">Debits (USD)</div>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Net flow</div>
-                  <div className={`text-xl font-extrabold mt-1 ${net >= 0 ? "text-green-600" : "text-red-600"}`}>{net >= 0 ? "+" : "−"}{formatMoney(Math.abs(Math.round(net)), "USD")}</div>
-                  <div className="text-xs text-slate-400 mt-1">In − out (USD)</div>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Transactions</div>
-                  <div className="text-xl font-extrabold text-slate-900 mt-1">{payments.length}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Total paid</div>
+                  <div className="text-xl font-extrabold text-slate-900 mt-1">{formatMoney(Math.round(totalPaid), "USD")}</div>
                   <div className="text-xs text-slate-400 mt-1">Last 30 days</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Bills paid</div>
+                  <div className="text-xl font-extrabold text-slate-900 mt-1">{paid.length}</div>
+                  <div className="text-xs text-slate-400 mt-1">Successful payments</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Avg. per bill</div>
+                  <div className="text-xl font-extrabold text-slate-900 mt-1">{formatMoney(Math.round(avgPerBill), "USD")}</div>
+                  <div className="text-xs text-slate-400 mt-1">Across all billers</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Billers</div>
+                  <div className="text-xl font-extrabold text-slate-900 mt-1">{billerCount}</div>
+                  <div className="text-xs text-slate-400 mt-1">Distinct payees</div>
                 </div>
               </div>
 
-              {/* Transactions table */}
+              {/* Bill payments table */}
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 text-sm">Transactions</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">Bill payments</h3>
                   <span className="text-xs text-slate-400">Last 30 days</span>
                 </div>
 
-                {/* Filters: search + channel + status + date range */}
+                {/* Filters: search + biller category + status + date range */}
                 <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3">
                   <div className="relative w-44">
                     <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" />
-                    <input value={payQ} onChange={(e) => { setPayQ(e.target.value); setPayPage(1); }} placeholder="Search…"
+                    <input value={payQ} onChange={(e) => { setPayQ(e.target.value); setPayPage(1); }} placeholder="Search billers…"
                       className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600" />
                   </div>
                   <select value={actCh} onChange={(e) => { setActCh(e.target.value); setPayPage(1); }}
                     className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
-                    {TXN_CHANNELS.map((c) => <option key={c} value={c}>{c === "All" ? "All channels" : c}</option>)}
+                    <option value="All">All categories</option>
+                    {BILL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                   <select value={payStatus} onChange={(e) => { setPayStatus(e.target.value); setPayPage(1); }}
                     className="px-2.5 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20">
@@ -2568,14 +2633,14 @@ export default function Customer360Page() {
                 </div>
 
                 {rows.length === 0 ? (
-                  <EmptyState icon="receipt_long" message="No transactions match your filters" />
+                  <EmptyState icon="receipt_long" message="No bill payments match your filters" />
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Description</th>
-                          <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Channel</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600">Biller</th>
+                          <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Category</th>
                           <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Reference</th>
                           <th className="text-left px-4 py-3 font-semibold text-slate-600">Date</th>
                           <th className="text-right px-4 py-3 font-semibold text-slate-600">Amount</th>
@@ -2587,27 +2652,27 @@ export default function Customer360Page() {
                           <tr key={t.id} className="hover:bg-slate-50">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2.5">
-                                <Icon name={t.channel === "KHQR" ? "qr_code_2" : t.channel === "Bakong" ? "currency_exchange" : t.channel === "Bill" ? "receipt" : "swap_horiz"}
+                                <Icon name={(t.category && BILL_CATEGORY_ICON[t.category]) || "receipt_long"}
                                   className="text-primary-600 bg-primary-50 rounded-lg p-1.5 text-lg flex-none" />
                                 <div className="min-w-0">
-                                  <div className="font-medium text-slate-800 truncate">{t.type}</div>
-                                  <div className="text-xs text-slate-400 truncate">{t.counterparty}</div>
+                                  <div className="font-medium text-slate-800 truncate">{t.counterparty}</div>
+                                  <div className="text-xs text-slate-400 truncate">{t.type}</div>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{t.channel}</td>
+                            <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{t.category}</td>
                             <td className="px-4 py-3 text-slate-400 font-mono text-xs hidden lg:table-cell">{t.id}</td>
                             <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(t.date)} · {t.time}</td>
-                            <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${t.amount > 0 ? "text-green-600" : "text-slate-800"}`}>{t.amount > 0 ? "+" : "−"}{formatMoney(Math.abs(t.amount), t.ccy)}</td>
+                            <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-slate-800">−{formatMoney(Math.abs(t.amount), t.ccy)}</td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${t.status === "Reversed" ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>{t.status}</span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${t.status === "Reversed" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{t.status}</span>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-sm">
-                      <div className="text-slate-500">Showing {start + 1}–{Math.min(start + payPerPage, rows.length)} of {rows.length} transactions</div>
+                      <div className="text-slate-500">Showing {start + 1}–{Math.min(start + payPerPage, rows.length)} of {rows.length} bill payments</div>
                       <div className="flex items-center gap-4">
                         <label className="flex items-center gap-2 text-slate-500">
                           <span className="whitespace-nowrap">Rows per page</span>
@@ -2643,8 +2708,6 @@ export default function Customer360Page() {
               { dot: "bg-slate-300", stroke: "stroke-slate-300" },
             ];
             const activeAcc = (selectedAccountHistory ? casaAccounts.find((x) => x.no === selectedAccountHistory) : casaAccounts[0]) ?? casaAccounts[0];
-            const totalUsdEq = casaAccounts.reduce((sum, a) => sum + usd(a.balance, a.ccy), 0);
-            const radius = 15.91549431;
             return (
               <div className="space-y-5">
                 <div>
@@ -2658,7 +2721,7 @@ export default function Customer360Page() {
                   </div>
                 ) : (
                   <>
-                    {/* Account selector + portfolio donut */}
+                    {/* Account selector */}
                     <div className="flex gap-4 overflow-x-auto pb-2">
                       {casaAccounts.map((a, i) => {
                         const isActive = activeAcc?.no === a.no;
@@ -2677,43 +2740,6 @@ export default function Customer360Page() {
                           </button>
                         );
                       })}
-
-                      {/* Portfolio donut */}
-                      <div className="flex-none w-60 p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col items-center justify-center">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 h-4 flex items-center justify-center w-full px-2 truncate">
-                          {hoveredSlice !== null && casaAccounts[hoveredSlice] ? (
-                            <span className="flex items-center gap-1.5 text-slate-700">
-                              <span className={`w-2 h-2 rounded-full ${PAL[hoveredSlice % PAL.length].dot}`} />
-                              <span className="truncate">{casaAccounts[hoveredSlice].type}</span>
-                            </span>
-                          ) : "Total portfolio"}
-                        </div>
-                        <div className="relative w-16 h-16 mb-3">
-                          <svg viewBox="0 0 42 42" className="w-full h-full -rotate-90">
-                            <circle cx="21" cy="21" r={radius} fill="transparent" className="stroke-slate-200" strokeWidth="8" />
-                            {(() => {
-                              let currentAngle = 0;
-                              return casaAccounts.map((a, i) => {
-                                const pct = totalUsdEq > 0 ? (usd(a.balance, a.ccy) / totalUsdEq) * 100 : 0;
-                                const dashArray = `${pct} ${100 - pct}`;
-                                const offset = -currentAngle;
-                                currentAngle += pct;
-                                return (
-                                  <circle key={a.no} cx="21" cy="21" r={radius} fill="transparent"
-                                    onMouseEnter={() => setHoveredSlice(i)} onMouseLeave={() => setHoveredSlice(null)}
-                                    className={`${PAL[i % PAL.length].stroke} transition-all duration-300 outline-none cursor-pointer ${hoveredSlice === i ? "opacity-100" : hoveredSlice !== null ? "opacity-40" : ""}`}
-                                    strokeWidth={hoveredSlice === i ? 10 : 8} strokeDasharray={dashArray} strokeDashoffset={offset} />
-                                );
-                              });
-                            })()}
-                          </svg>
-                        </div>
-                        <div className="text-base font-extrabold text-slate-900 tracking-tight h-6 flex items-center">
-                          {hoveredSlice !== null && casaAccounts[hoveredSlice]
-                            ? formatMoney(casaAccounts[hoveredSlice].balance, casaAccounts[hoveredSlice].ccy)
-                            : formatMoney(Math.round(totalUsdEq), "USD")}
-                        </div>
-                      </div>
                     </div>
 
                     {/* Active account detail */}
@@ -2815,7 +2841,7 @@ export default function Customer360Page() {
                                     </div>
                                   </div>
                                 ))}
-                                <button onClick={() => setTab("Payments")}
+                                <button onClick={() => setTab("Bill Payments")}
                                   className="w-full mt-2 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors">
                                   View full history →
                                 </button>
@@ -2826,22 +2852,6 @@ export default function Customer360Page() {
                       );
                     })()}
                   </>
-                )}
-
-                {savingsBal > 0 && (
-                  <Section title="Savings goals">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800">{goalName}</div>
-                        <div className="text-xs text-slate-400">Round-up savings · On · auto-save monthly</div>
-                      </div>
-                      <div className="text-sm font-bold text-slate-900 text-right">{formatMoney(Math.round(savingsBal), "USD")} <span className="text-slate-400 font-normal">/ {formatMoney(goalTarget, "USD")}</span></div>
-                    </div>
-                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gold rounded-full" style={{ width: `${goalPct}%` }} />
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1.5">{goalPct}% funded</div>
-                  </Section>
                 )}
               </div>
             );
@@ -2959,6 +2969,29 @@ export default function Customer360Page() {
                   );
                 })()}
               </Section>
+
+              {(() => {
+                const savingsBal = customer.accounts.filter((a) => a.type.startsWith("Savings")).reduce((s, a) => s + usd(a.balance, a.ccy), 0);
+                if (savingsBal <= 0) return null;
+                const goalName = customer.segment === "Affluent" ? "Property downpayment" : customer.segment === "SME" ? "Business expansion fund" : "Emergency fund";
+                const goalTarget = Math.max(2000, Math.round((savingsBal * 1.6) / 500) * 500);
+                const goalPct = goalTarget ? Math.min(100, Math.round((savingsBal / goalTarget) * 100)) : 0;
+                return (
+                  <Section title="Savings goals">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">{goalName}</div>
+                        <div className="text-xs text-slate-400">Round-up savings · On · auto-save monthly</div>
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 text-right">{formatMoney(Math.round(savingsBal), "USD")} <span className="text-slate-400 font-normal">/ {formatMoney(goalTarget, "USD")}</span></div>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gold rounded-full" style={{ width: `${goalPct}%` }} />
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1.5">{goalPct}% funded</div>
+                  </Section>
+                );
+              })()}
             </div>
           )}
 
@@ -3153,8 +3186,12 @@ export default function Customer360Page() {
           {/* --- Loans (read-only) --- */}
           {tab === "Loans" && (
             <div className="space-y-5">
+              <div>
+                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Loan</h2>
+                <p className="text-sm text-slate-500 mt-0.5">A customer&apos;s loan summary, for reference.</p>
+              </div>
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
+                <h3 className="text-lg font-bold text-slate-900">{customer.name}</h3>
                 {customer.loans.length > 0 ? (
                   <span className="whitespace-nowrap rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Active Loan</span>
                 ) : (
@@ -3167,7 +3204,8 @@ export default function Customer360Page() {
                   <EmptyState icon="account_balance" message="This customer does not have any loans." />
                 </div>
               ) : (
-                customer.loans.map((l) => (
+                <div className="grid gap-5 lg:grid-cols-2 items-start">
+                {customer.loans.map((l) => (
                   <div key={l.id} className="space-y-3">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-slate-900">{l.product}</h3>
@@ -3178,30 +3216,33 @@ export default function Customer360Page() {
                         <Icon name="warning" className="text-red-500 text-base" /> In arrears — {l.status}. Collections workflow applies.
                       </div>
                     )}
-                    <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
-                      <LoanDetailCard
-                        title="Loan Overview"
-                        rows={[
-                          { label: "Loan ID", value: l.id },
-                          { label: "Loan Product", value: l.product },
-                          { label: "Loan Amount", value: formatMoney(l.amount, l.ccy) },
-                          { label: "Interest Rate", value: `${l.rate} p.a.` },
-                          { label: "Start Date", value: formatDate(l.startDate) },
-                          { label: "Loan Term", value: `${l.termMonths} months` },
-                          { label: "Remaining Balance", value: formatMoney(l.outstanding, l.ccy), highlight: true },
-                        ]}
-                      />
-                      <LoanDetailCard
-                        title="Upcoming Repayment"
-                        rows={[
-                          { label: "Next Payment", value: formatDate(l.nextDue) },
-                          { label: "Repayment Amount", value: formatMoney(l.installment, l.ccy) },
-                          { label: "Months Left", value: `${l.monthsRemaining} months` },
-                        ]}
-                      />
-                    </div>
+                    <LoanDetailCard
+                      sections={[
+                        {
+                          title: "Loan Overview",
+                          rows: [
+                            { label: "Loan ID", value: l.id },
+                            { label: "Loan Product", value: l.product },
+                            { label: "Loan Amount", value: formatMoney(l.amount, l.ccy) },
+                            { label: "Interest Rate", value: `${l.rate} p.a.` },
+                            { label: "Start Date", value: formatDate(l.startDate) },
+                            { label: "Loan Term", value: `${l.termMonths} months` },
+                            { label: "Remaining Balance", value: formatMoney(l.outstanding, l.ccy), highlight: true },
+                          ],
+                        },
+                        {
+                          title: "Upcoming Repayment",
+                          rows: [
+                            { label: "Next Payment", value: formatDate(l.nextDue) },
+                            { label: "Repayment Amount", value: formatMoney(l.installment, l.ccy) },
+                            { label: "Months Left", value: `${l.monthsRemaining} months` },
+                          ],
+                        },
+                      ]}
+                    />
                   </div>
-                ))
+                ))}
+                </div>
               )}
             </div>
           )}
@@ -3225,8 +3266,11 @@ export default function Customer360Page() {
                             <div key={i} onClick={() => setSelectedInvestment(iv)}
                                  className={`flex-none w-64 p-4 rounded-xl border cursor-pointer transition-all ${isActive ? 'border-gold bg-goldbg shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                               <div className="flex justify-between items-start mb-4">
-                                <div className="text-xs font-bold tracking-wide text-slate-800 truncate pr-2">{iv.type}</div>
-                                <div className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">USD</div>
+                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                  <InvestmentLogo type={iv.type} />
+                                  <div className="text-xs font-bold tracking-wide text-slate-800 truncate">{iv.type}</div>
+                                </div>
+                                <div className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded flex-none">USD</div>
                               </div>
                               <div className="text-xl font-extrabold text-slate-900 tracking-tight">{formatMoney(iv.value, "USD")}</div>
                               <div className="text-[11px] font-mono text-slate-500 mt-1">Value</div>
@@ -3240,6 +3284,7 @@ export default function Customer360Page() {
                         <div className="flex flex-col md:flex-row justify-between items-start mb-8 pb-8 border-b border-slate-100">
                           <div>
                             <div className="flex items-center gap-2 mb-2">
+                              <InvestmentLogo type={activeInvestment.type} />
                               <div className="text-[10px] font-bold tracking-wide text-primary-700 uppercase bg-primary-50 px-2 py-1 rounded">{activeInvestment.type}</div>
                               <div className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">PORTFOLIO: {investTotal ? Math.round((activeInvestment.value / investTotal) * 100) : 0}%</div>
                             </div>
@@ -3341,7 +3386,10 @@ export default function Customer360Page() {
                             <div key={i} onClick={() => setSelectedInsurance(p)}
                                  className={`flex-none w-64 p-4 rounded-xl border cursor-pointer transition-all ${isActive ? 'border-gold bg-goldbg shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                               <div className="flex justify-between items-start mb-4">
-                                <div className="text-xs font-bold tracking-wide text-slate-800 truncate pr-2">{p.policy}</div>
+                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                  <InsuranceLogo policy={p.policy} />
+                                  <div className="text-xs font-bold tracking-wide text-slate-800 truncate">{p.policy}</div>
+                                </div>
                                 <Badge label={p.status} />
                               </div>
                               <div className="text-xl font-extrabold text-slate-900 tracking-tight">~${(premNum * 1000).toLocaleString()}</div>
@@ -3356,6 +3404,7 @@ export default function Customer360Page() {
                         <div className="flex flex-col md:flex-row justify-between items-start mb-8 pb-8 border-b border-slate-100">
                           <div>
                             <div className="flex items-center gap-2 mb-2">
+                              <InsuranceLogo policy={activeInsurance.policy} />
                               <div className="text-[10px] font-bold tracking-wide text-primary-700 uppercase bg-primary-50 px-2 py-1 rounded">INSURANCE</div>
                               <Badge label={activeInsurance.status} />
                             </div>
@@ -4335,78 +4384,131 @@ export default function Customer360Page() {
 
           {/* --- Reminder --- */}
           {tab === "Reminder" && (() => {
-            const groups = [
-              {
-                icon: "error_outline", iconColor: "text-rose-500", title: "My Alerts",
-                count: "2 Alerts", countClass: "bg-rose-100 text-rose-700",
-                meta: "Time", tagHead: "Status",
-                rows: [
-                  { subject: "KYC Update Required", details: "Customer's National ID expires in 3 days. Please request updated documents.", when: "2 hours ago", tag: "Action Needed", tagClass: "text-rose-500 bg-rose-50" },
-                  { subject: "Address Proof Missing", details: "Utility bill upload failed validation.", when: "Yesterday", tag: "Pending", tagClass: "text-amber-500 bg-amber-50" },
-                ],
-              },
-              {
-                icon: "swap_horiz", iconColor: "text-blue-500", title: "Transactions",
-                count: "2 Upcoming", countClass: "bg-blue-100 text-blue-700",
-                meta: "Date", tagHead: "Type",
-                rows: [
-                  { subject: "Fixed Deposit Maturity", details: "FD Account *8812 ($50,000) is maturing. Contact for renewal.", when: "Tomorrow", tag: "System", tagClass: "text-blue-600 bg-blue-50" },
-                  { subject: "Scheduled Transfer", details: "$500.00 to EDC Billing. Funds are available.", when: "Today", tag: "Auto-Pay", tagClass: "text-emerald-600 bg-emerald-50" },
-                ],
-              },
-              {
-                icon: "campaign", iconColor: "text-purple-500", title: "Announcements",
-                count: "2 Notices", countClass: "bg-purple-100 text-purple-700",
-                meta: "Origin", tagHead: "Tag",
-                rows: [
-                  { subject: "New Premium Card Launch", details: "This customer is eligible for the new Visa Infinite. Mention during next contact.", when: "Marketing", tag: "Campaign", tagClass: "text-purple-600 bg-purple-50", dim: false },
-                  { subject: "Branch Holiday Notice", details: "All branches will be closed next Monday. Digital channels remain open.", when: "Admin", tag: "Info", tagClass: "text-slate-500 bg-slate-100", dim: true },
-                ],
-              },
+            const seeded: ReminderRow[] = [
+              { id: "RMD-01", type: "alert", subject: "KYC Update Required", details: "Customer's National ID expires in 3 days. Please request updated documents.", priority: "High", assignedTo: "Tit Thida", time: "2 hours ago", statusLabel: "Action Needed", statusColorClass: "text-rose-600 bg-rose-50" },
+              { id: "RMD-02", type: "alert", subject: "Address Proof Missing", details: "Utility bill upload failed validation.", priority: "Medium", assignedTo: "Mom Thavy", time: "Yesterday", statusLabel: "Pending", statusColorClass: "text-amber-600 bg-amber-50" },
+              { id: "RMD-03", type: "transaction", subject: "Fixed Deposit Maturity", details: "FD Account *8812 ($50,000) is maturing. Contact for renewal.", priority: "Medium", assignedTo: "System", time: "Tomorrow", statusLabel: "Upcoming", statusColorClass: "text-blue-600 bg-blue-50" },
+              { id: "RMD-04", type: "transaction", subject: "Scheduled Transfer", details: "$500.00 to EDC Billing. Funds are available.", priority: "Low", assignedTo: "Auto-Pay", time: "Today", statusLabel: "Scheduled", statusColorClass: "text-emerald-600 bg-emerald-50" },
+              { id: "RMD-05", type: "announcement", subject: "New Premium Card Launch", details: "This customer is eligible for the new Visa Infinite. Mention during next contact.", priority: "Low", assignedTo: "Marketing", time: "Marketing", statusLabel: "Campaign", statusColorClass: "text-purple-600 bg-purple-50" },
+              { id: "RMD-06", type: "announcement", subject: "Branch Holiday Notice", details: "All branches will be closed next Monday. Digital channels remain open.", priority: "Low", assignedTo: "Admin", time: "Admin", statusLabel: "Info", statusColorClass: "text-slate-500 bg-slate-100" },
             ];
+            const reminders: ReminderRow[] = [...reminderAdded, ...seeded];
+            const handleSendReminder = () => {
+              const t = reminderForm.type as ReminderRow["type"];
+              if (!t || !reminderForm.subject.trim()) { setToast({ message: "Choose a type and enter a subject", type: "error" }); return; }
+              const nr: ReminderRow = {
+                id: `RMD-NEW-${reminderAdded.length + 1}`, type: t,
+                subject: reminderForm.subject.trim(), details: reminderForm.body.trim() || "—",
+                priority: "Medium", assignedTo: "You", time: "Just now",
+                statusLabel: "Sent", statusColorClass: "text-green-700 bg-green-50",
+              };
+              setReminderAdded([nr, ...reminderAdded]);
+              setReminderForm({ type: "", subject: "", body: "" });
+              setToast({ message: "Reminder sent", type: "success" });
+            };
+            const filtered = reminders.filter((r) => reminderFilter === "All" || r.type === REMINDER_FILTER_MAP[reminderFilter]);
+            const inputCls = "px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 text-sm text-slate-900 placeholder-slate-400";
             return (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Notification Center</h2>
-                    <p className="text-sm text-slate-500 mt-1">Important alerts, upcoming transactions, and announcements for this customer.</p>
-                  </div>
-                  <button className="px-4 py-2 bg-white border border-slate-200 text-sm font-bold text-slate-700 rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
-                    Mark all as read
+              <div className="space-y-5">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Reminder</h2>
+                  <p className="text-sm text-slate-500 mt-1">Important alerts, upcoming transactions, and announcements for this customer.</p>
+                </div>
+
+                {/* Inline send-reminder form */}
+                <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <select value={reminderForm.type} onChange={(e) => setReminderForm({ ...reminderForm, type: e.target.value })}
+                    className={`${inputCls} sm:w-36 cursor-pointer`}>
+                    <option value="" disabled>Type…</option>
+                    <option value="alert">Alert</option>
+                    <option value="transaction">Transaction</option>
+                    <option value="announcement">Announcement</option>
+                  </select>
+                  <input type="text" placeholder="Subject" value={reminderForm.subject}
+                    onChange={(e) => setReminderForm({ ...reminderForm, subject: e.target.value })}
+                    className={`${inputCls} sm:w-56`} />
+                  <input type="text" placeholder="Type message body…" value={reminderForm.body}
+                    onChange={(e) => setReminderForm({ ...reminderForm, body: e.target.value })}
+                    className={`${inputCls} flex-1`} />
+                  <button type="button" onClick={handleSendReminder}
+                    className="inline-flex items-center justify-center gap-1.5 px-5 py-2 bg-gold text-navy text-sm font-bold rounded-lg hover:brightness-95 transition-colors shrink-0">
+                    <Icon name="send" className="text-base" />Send
                   </button>
                 </div>
 
-                {groups.map((g, gi) => (
-                  <Section key={gi}
-                    title={<span className="flex items-center gap-2"><Icon name={g.icon} className={g.iconColor} /> {g.title}</span>}
-                    action={<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${g.countClass}`}>{g.count}</span>}
-                  >
-                    <div className="overflow-x-auto -mx-5 -mb-5 rounded-b-xl">
-                      <table className="w-full text-left border-collapse whitespace-nowrap">
-                        <thead>
-                          <tr className="bg-slate-50 border-y border-slate-100 text-[10px] uppercase tracking-widest text-slate-500">
-                            <th className="px-5 py-3 font-bold w-1/4">Subject</th>
-                            <th className="px-5 py-3 font-bold w-1/2">Details</th>
-                            <th className="px-5 py-3 font-bold">{g.meta}</th>
-                            <th className="px-5 py-3 font-bold text-right">{g.tagHead}</th>
+                {/* Type filters */}
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {["All", "Alerts", "Transactions", "Announcements"].map((f) => {
+                    const count = f === "All" ? reminders.length : reminders.filter((r) => r.type === REMINDER_FILTER_MAP[f]).length;
+                    const active = reminderFilter === f;
+                    return (
+                      <button key={f} onClick={() => setReminderFilter(f)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${active ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}>
+                        {f} <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <Section
+                  title={<span className="flex items-center gap-2"><Icon name="notifications" className="text-primary-600" /> All Reminders</span>}
+                  action={<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-primary-100 text-primary-700">{filtered.length} Reminders</span>}
+                >
+                  <div className="overflow-x-auto -mx-5 -mb-5 rounded-b-xl">
+                    <table className="w-full text-left border-collapse whitespace-nowrap">
+                      <thead>
+                        <tr className="bg-slate-50 border-y border-slate-100 text-[10px] uppercase tracking-widest text-slate-500">
+                          <th className="px-5 py-3 font-bold">Type</th>
+                          <th className="px-5 py-3 font-bold w-1/4">Subject</th>
+                          <th className="px-5 py-3 font-bold w-1/2">Details</th>
+                          <th className="px-5 py-3 font-bold">Time</th>
+                          <th className="px-5 py-3 font-bold text-right">Status</th>
+                          <th className="px-5 py-3 font-bold text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-sm">
+                        {filtered.length === 0 ? (
+                          <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">No reminders in this view</td></tr>
+                        ) : filtered.map((r) => {
+                          const meta = REMINDER_TYPE_META[r.type];
+                          return (
+                          <tr key={r.id} className="hover:bg-slate-50 transition-colors group">
+                            <td className={`px-5 py-3 ${meta.borderColorClass}`}>
+                              <div className="flex items-center gap-2 font-bold text-slate-900 capitalize">
+                                <Icon name={meta.icon} className={`${meta.iconColorClass} text-[16px]`} /> {r.type}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 font-bold text-slate-900">
+                              <div className="flex items-center gap-2">
+                                <span>{r.subject}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${r.priority === "High" ? "text-rose-600 bg-rose-50" : r.priority === "Medium" ? "text-amber-600 bg-amber-50" : "text-slate-500 bg-slate-100"}`}>{r.priority}</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 whitespace-normal">
+                              <div className="text-slate-500">{r.details}</div>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">{getInitial(r.assignedTo)}</div>
+                                <span className="text-[10px] text-slate-500 font-medium">{r.assignedTo}</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 text-slate-400 font-medium text-xs">{r.time}</td>
+                            <td className="px-5 py-3 text-right">
+                              <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${r.statusColorClass}`}>{r.statusLabel}</span>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded" aria-label="View"><Icon name="visibility" className="text-[16px]" /></button>
+                                <button className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded" aria-label="Call"><Icon name="call" className="text-[16px]" /></button>
+                                <button className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded" aria-label="Resolve"><Icon name="check" className="text-[16px]" /></button>
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-sm">
-                          {g.rows.map((r, ri) => (
-                            <tr key={ri} className={`hover:bg-slate-50 transition-colors group ${"dim" in r && r.dim ? "opacity-70" : ""}`}>
-                              <td className="px-5 py-3 font-bold text-slate-900">{r.subject}</td>
-                              <td className="px-5 py-3 text-slate-500 whitespace-normal">{r.details}</td>
-                              <td className="px-5 py-3 text-slate-400 font-medium text-xs">{r.when}</td>
-                              <td className="px-5 py-3 text-right">
-                                <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${r.tagClass}`}>{r.tag}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Section>
-                ))}
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
               </div>
             );
           })()}
@@ -4453,20 +4555,6 @@ export default function Customer360Page() {
                         12,650 pts remaining
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4">Quick Actions</h3>
-                  <div className="space-y-3">
-                    <button className="w-full py-3 px-4 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700 transition-all flex items-center justify-between group">
-                      <span>Manual Point Adjustment</span>
-                      <Icon name="add_circle_outline" className="text-slate-400 group-hover:text-amber-500 transition-colors" />
-                    </button>
-                    <button className="w-full py-3 px-4 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700 transition-all flex items-center justify-between group">
-                      <span>Redeem on Behalf</span>
-                      <Icon name="redeem" className="text-slate-400 group-hover:text-amber-500 transition-colors" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -4564,10 +4652,6 @@ export default function Customer360Page() {
                       className="inline-flex items-center gap-1.5 px-3 py-2.5 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
                       <Icon name="refresh" className="text-lg" /><span className="hidden sm:inline">Refresh</span>
                     </button>
-                    <button onClick={() => setCallForm({ mode: "create", record: null })}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-gold text-navy text-sm font-semibold rounded-lg hover:brightness-95">
-                      <Icon name="add" className="text-lg" /><span className="hidden sm:inline">Log call activity</span>
-                    </button>
                   </div>
                 </div>
 
@@ -4619,6 +4703,7 @@ export default function Customer360Page() {
                             <th className="text-left px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">Duration</th>
                             <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Agent</th>
                             <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Phone</th>
+                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Voice record</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
@@ -4640,6 +4725,23 @@ export default function Customer360Page() {
                               <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.duration}</td>
                               <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{r.agent}</td>
                               <td className="px-4 py-3 text-slate-600 hidden lg:table-cell font-mono text-xs">{r.phone}</td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {r.voiceRecordFile ? (
+                                  <button type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const blob = new Blob([`Voice recording placeholder for ${r.id} (${r.voiceRecordFile})`], { type: "text/plain" });
+                                      const url = URL.createObjectURL(blob);
+                                      const a = document.createElement("a"); a.href = url; a.download = r.voiceRecordFile; a.click();
+                                      URL.revokeObjectURL(url);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                    <Icon name="play_circle" className="text-base text-primary-600" />Play
+                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Icon name="voice_over_off" className="text-base" />No recording</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -5036,8 +5138,13 @@ export default function Customer360Page() {
                               className="hover:bg-slate-50 cursor-pointer focus:outline-none focus:bg-primary-50/50">
                               <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{r.date}</td>
                               <td className="px-4 py-3">
-                                <div className="font-medium text-slate-800">{r.record}</div>
-                                <div className="text-xs text-slate-400 font-mono">{r.id}</div>
+                                <div className="flex items-center gap-2.5">
+                                  <MiniAppLogo name={r.record} category={r.category} />
+                                  <div>
+                                    <div className="font-medium text-slate-800">{r.record}</div>
+                                    <div className="text-xs text-slate-400 font-mono">{r.id}</div>
+                                  </div>
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{r.category}</td>
                               <td className="px-4 py-3 text-slate-600 hidden lg:table-cell whitespace-nowrap">{r.duration}</td>
@@ -5354,9 +5461,12 @@ export default function Customer360Page() {
             const focusEvent = filtered.find((e) => e.id === locEventId) ?? null;
             return (
               <div className="space-y-4">
-                <p className="text-sm text-slate-500">Where this customer opened the app over time, and what they used it for.</p>
+                <div>
+                  <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Locations</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">Where this customer opened the app over time, and what they used it for.</p>
+                </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
+                  <h2 className="text-sm font-bold text-slate-900">Customer Name : <span className="text-slate-700">{customer.name}</span></h2>
                   <select
                     value={locMonth}
                     onChange={(e) => { setLocMonth(e.target.value); setLocEventId(null); }}
@@ -5367,36 +5477,74 @@ export default function Customer360Page() {
                   </select>
                 </div>
 
-                <LocationMap events={filtered} focus={focusEvent} />
-
                 {events.length === 0 ? (
                   <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
                     <EmptyState icon="location_off" message="No recorded app activity for this customer." />
                   </div>
-                ) : filtered.length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-                    <EmptyState icon="event_busy" message="No activity in this month." />
-                  </div>
                 ) : (
-                  <ol className="border-l border-slate-200 pl-5">
-                    {filtered.map((ev) => {
-                      const isSelected = ev.id === locEventId;
-                      return (
-                        <li key={ev.id} className="relative pb-5 last:pb-0">
-                          <span className={`absolute -left-5 top-[18px] h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ${isSelected ? "bg-gold" : "bg-slate-300"}`} />
-                          <button
-                            type="button"
-                            onClick={() => setLocEventId(isSelected ? null : ev.id)}
-                            className={`-mx-2 flex w-[calc(100%+0.5rem)] flex-col rounded-lg px-2 py-1.5 text-left transition-colors ${isSelected ? "bg-slate-100" : "hover:bg-slate-50"}`}
-                          >
-                            <span className="text-xs text-slate-500">{ev.time}</span>
-                            <span className="mt-0.5 text-sm font-semibold text-slate-900">{ev.location}</span>
-                            <span className="mt-0.5 text-sm text-slate-500">{ev.purpose} · {ev.device}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                  <>
+                    {/* Location history table */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-slate-900">Location History</h3>
+                        <span className="text-xs text-slate-400">{filtered.length} {filtered.length === 1 ? "entry" : "entries"}</span>
+                      </div>
+                      {filtered.length === 0 ? (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+                          <EmptyState icon="event_busy" message="No activity in this month." />
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                          <table className="w-full text-left border-collapse whitespace-nowrap text-sm">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-500">
+                                <th className="px-5 py-3 font-bold">Date</th>
+                                <th className="px-5 py-3 font-bold">Time</th>
+                                <th className="px-5 py-3 font-bold">Location</th>
+                                <th className="px-5 py-3 font-bold">Purpose</th>
+                                <th className="px-5 py-3 font-bold">Device</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {filtered.map((ev) => {
+                                const isSelected = ev.id === locEventId;
+                                const [datePart, timePart] = ev.time.split(" - ");
+                                const isWeb = /web|browser/i.test(ev.device);
+                                return (
+                                  <tr key={ev.id}
+                                    onClick={() => setLocEventId(isSelected ? null : ev.id)}
+                                    className={`cursor-pointer transition-colors ${isSelected ? "bg-goldbg" : "hover:bg-slate-50"}`}>
+                                    <td className="px-5 py-3 text-slate-500">{datePart}</td>
+                                    <td className="px-5 py-3 text-slate-500">{timePart}</td>
+                                    <td className="px-5 py-3">
+                                      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900">
+                                        <Icon name="location_on" className={`text-base ${isSelected ? "text-gold" : "text-slate-400"}`} />{ev.location}
+                                      </span>
+                                    </td>
+                                    <td className="px-5 py-3 text-slate-600">{ev.purpose}</td>
+                                    <td className="px-5 py-3 text-slate-500">
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <Icon name={isWeb ? "language" : "smartphone"} className="text-base text-slate-400" />{ev.device}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Map */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-slate-900">Location</h3>
+                        <span className="text-xs text-slate-400">{filtered.length} {filtered.length === 1 ? "location" : "locations"} shown</span>
+                      </div>
+                      <LocationMap events={filtered} focus={focusEvent} />
+                    </div>
+                  </>
                 )}
               </div>
             );
@@ -5405,10 +5553,14 @@ export default function Customer360Page() {
           {/* --- Gift Zone (read-only) --- */}
           {tab === "Gift Zone" && (() => {
             const gifts = customer.gifts ?? [];
-            const totalSent = gifts.reduce((s, g) => s + g.amount, 0);
+            const totalSent = gifts.filter((g) => g.status !== "Failed").reduce((s, g) => s + g.amount, 0);
+            const pending = gifts.filter((g) => g.status === "Pending").length;
             return (
               <div className="space-y-5">
-                <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">Money gifts this customer sent to others through mobile banking.</p>
+                </div>
 
                 {gifts.length === 0 ? (
                   <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
@@ -5416,39 +5568,56 @@ export default function Customer360Page() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
                       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
-                        <div className="text-sm text-slate-500">Gifts Sent</div>
-                        <div className="mt-1 text-lg font-bold text-slate-900">{gifts.length}</div>
+                        <div className="flex items-center gap-2 text-slate-400"><span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center"><Icon name="card_giftcard" className="text-lg text-slate-500" /></span><span className="text-[11px] font-bold uppercase tracking-wide">Gifts Sent</span></div>
+                        <div className="mt-3 text-2xl font-extrabold text-slate-900">{gifts.length}</div>
                       </div>
-                      <div className="border border-amber-200 bg-amber-50 rounded-xl shadow-sm p-5">
-                        <div className="text-sm text-slate-500">Total Amount Sent</div>
-                        <div className="mt-1 text-lg font-bold text-amber-700">{formatMoney(totalSent, "USD")}</div>
+                      <div className="bg-goldbg border border-gold/40 rounded-xl shadow-sm p-5">
+                        <div className="flex items-center gap-2 text-slate-500"><span className="w-8 h-8 rounded-lg bg-gold/30 flex items-center justify-center"><Icon name="payments" className="text-lg text-amber-700" /></span><span className="text-[11px] font-bold uppercase tracking-wide">Total Amount Sent</span></div>
+                        <div className="mt-3 text-2xl font-extrabold text-slate-900">{formatMoney(totalSent, "USD")}</div>
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+                        <div className="flex items-center gap-2 text-slate-400"><span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center"><Icon name="schedule" className="text-lg text-slate-500" /></span><span className="text-[11px] font-bold uppercase tracking-wide">Pending</span></div>
+                        <div className="mt-3 text-2xl font-extrabold text-slate-900">{pending}</div>
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 mb-3">Gift History</h3>
-                      <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                        {gifts.map((g, i) => (
-                          <button
-                            key={g.id}
-                            type="button"
-                            onClick={() => setSelectedGift(g)}
-                            className={`flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-slate-50 transition-colors ${i !== gifts.length - 1 ? "border-b border-slate-100" : ""}`}
-                          >
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">
-                                To {g.recipientName} <span className="font-normal text-slate-500">· {g.occasion}</span>
-                              </p>
-                              <p className="mt-0.5 text-xs text-slate-500">{g.recipientPhone} · {g.date}</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-semibold text-slate-900">{formatMoney(g.amount, g.ccy)}</span>
-                              <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${GIFT_STATUS_STYLES[g.status]}`}>{g.status}</span>
-                            </div>
-                          </button>
-                        ))}
+                      <h3 className="text-sm font-bold text-slate-900 mb-2">Gift History</h3>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <table className="w-full text-left border-collapse whitespace-nowrap text-sm">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-widest text-slate-500">
+                              <th className="px-4 py-3 font-bold">Date</th>
+                              <th className="px-4 py-3 font-bold">Reference ID</th>
+                              <th className="px-4 py-3 font-bold">Recipient</th>
+                              <th className="px-4 py-3 font-bold">Phone</th>
+                              <th className="px-4 py-3 font-bold">Occasion</th>
+                              <th className="px-4 py-3 font-bold">Method</th>
+                              <th className="px-4 py-3 font-bold text-right">Amount</th>
+                              <th className="px-4 py-3 font-bold">Fee</th>
+                              <th className="px-4 py-3 font-bold">Message</th>
+                              <th className="px-4 py-3 font-bold text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {gifts.map((g) => (
+                              <tr key={g.id} onClick={() => setSelectedGift(g)} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3 text-slate-500">{g.date}</td>
+                                <td className="px-4 py-3 text-slate-400 font-mono text-xs">{g.referenceId}</td>
+                                <td className="px-4 py-3 font-semibold text-slate-900">{g.recipientName}</td>
+                                <td className="px-4 py-3 text-slate-500 font-mono text-xs">{g.recipientPhone}</td>
+                                <td className="px-4 py-3 text-slate-600">{g.occasion}</td>
+                                <td className="px-4 py-3 text-slate-600">{g.method}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(g.amount, g.ccy)}</td>
+                                <td className="px-4 py-3 text-slate-500">{g.fee === 0 ? "Free" : formatMoney(g.fee, g.ccy)}</td>
+                                <td className="px-4 py-3 text-slate-500 italic max-w-[220px] truncate">{g.message || "—"}</td>
+                                <td className="px-4 py-3 text-right"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${GIFT_STATUS_STYLES[g.status]}`}>{g.status}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </>

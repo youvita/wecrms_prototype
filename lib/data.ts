@@ -30,7 +30,10 @@ export const CUSTOMERS: Customer[] = [
       { no: "•••• 4521", type: "Visa Debit", status: "Active", limits: "$2,000/day", controls: { online: true, contactless: true, intl: false } },
       { no: "•••• 8830", type: "Mastercard Credit", status: "Active", limits: "$5,000 limit", controls: { online: true, contactless: true, intl: true } },
     ],
-    loans: [{ id: "LN-2024-0871", product: "Home Loan", amount: 85000, ccy: "USD", outstanding: 61230, rate: "8.5%", startDate: "2021-03-01", termMonths: 240, installment: 737, monthsRemaining: 176, nextDue: "2026-08-01", status: "Performing" }],
+    loans: [
+      { id: "LN-2024-0871", product: "Home Loan", amount: 85000, ccy: "USD", outstanding: 61230, rate: "8.5%", startDate: "2021-03-01", termMonths: 240, installment: 737, monthsRemaining: 176, nextDue: "2026-08-01", status: "Performing" },
+      { id: "LN-2024-0176", product: "Vehicle Loan", amount: 15000, ccy: "USD", outstanding: 8420, rate: "9%", startDate: "2024-03-12", termMonths: 48, installment: 340, monthsRemaining: 28, nextDue: "2026-08-12", status: "Performing" },
+    ],
     investments: [
       { type: "CSX Securities", detail: "1,200 shares PPAP", value: 4980 },
       { type: "Government Bond", detail: "NBC 3Y Bond", value: 10000 },
@@ -215,7 +218,7 @@ export const CUSTOMERS: Customer[] = [
       {
         id: "SESS-88A2F9", sessionId: "SES-20260714-0912", customerId: "CIF-100241",
         dateISO: "2026-07-14T09:12", date: "Jul 14, 2026 - 9:12 AM", sessionEnd: "Jul 14, 2026 - 9:15 AM",
-        record: "EDC Electricity Payment", miniAppId: "MA-EDC-01", category: "Bill Payment",
+        record: "EDC Electricity", miniAppId: "MA-EDC-01", category: "Bill Payment",
         provider: "Electricité du Cambodge", providerType: "Utility",
         entrySource: "Home dashboard", entryScreen: "Mini App Home", exitScreen: "Payment Success",
         duration: "3m 12s", stage: "Completed", finalOutcome: "Bill paid successfully",
@@ -231,8 +234,8 @@ export const CUSTOMERS: Customer[] = [
       {
         id: "SESS-77B1C4", sessionId: "SES-20260712-1830", customerId: "CIF-100241",
         dateISO: "2026-07-12T18:30", date: "Jul 12, 2026 - 6:30 PM", sessionEnd: "Jul 12, 2026 - 6:34 PM",
-        record: "Flight Booking", miniAppId: "MA-FLY-02", category: "Travel",
-        provider: "Cambodia Angkor Air", providerType: "Airline",
+        record: "RedBus", miniAppId: "MA-FLY-02", category: "Travel",
+        provider: "RedBus", providerType: "Travel platform",
         entrySource: "Mini app store", entryScreen: "Flights Home", exitScreen: "Passenger Info",
         duration: "4m 05s", stage: "Abandoned", finalOutcome: "Left before payment",
         screenViews: 8, clickEvents: 15, abandonmentStep: "Payment method selection",
@@ -243,7 +246,7 @@ export const CUSTOMERS: Customer[] = [
       {
         id: "SESS-66C3D8", sessionId: "SES-20260708-2015", customerId: "CIF-100241",
         dateISO: "2026-07-08T20:15", date: "Jul 8, 2026 - 8:15 PM", sessionEnd: "Jul 8, 2026 - 8:17 PM",
-        record: "Phone Top-up", miniAppId: "MA-TOP-03", category: "Mobile Top-up",
+        record: "Smart 5G", miniAppId: "MA-TOP-03", category: "Mobile Top-up",
         provider: "Smart Axiata", providerType: "Telecom",
         entrySource: "Home dashboard", entryScreen: "Top-up Home", exitScreen: "Payment Error",
         duration: "1m 48s", stage: "Failed", finalOutcome: "Top-up failed — provider timeout",
@@ -260,8 +263,8 @@ export const CUSTOMERS: Customer[] = [
       {
         id: "SESS-55D4E1", sessionId: "SES-20260702-1140", customerId: "CIF-100241",
         dateISO: "2026-07-02T11:40", date: "Jul 2, 2026 - 11:40 AM", sessionEnd: "Jul 2, 2026 - 11:46 AM",
-        record: "Movie Tickets", miniAppId: "MA-MOV-04", category: "Entertainment",
-        provider: "Legend Cinema", providerType: "Merchant",
+        record: "Angkor DC", miniAppId: "MA-MOV-04", category: "Entertainment",
+        provider: "Angkor DC", providerType: "Merchant",
         entrySource: "Promotions banner", entryScreen: "Cinema Home", exitScreen: "Ticket Confirmed",
         duration: "5m 30s", stage: "Completed", finalOutcome: "Tickets purchased",
         screenViews: 9, clickEvents: 18, abandonmentStep: "—",
@@ -269,7 +272,7 @@ export const CUSTOMERS: Customer[] = [
         navigationPath: ["Home", "Cinema", "Select Movie", "Choose Seats", "Pay", "Ticket Confirmed"],
         transactionReference: "TXN-777980", partnerTransactionReference: "LEG-33110", transactionType: "Merchant Purchase",
         value: 9, currency: "USD", fee: 0.25, discount: 1, netAmount: 8.25,
-        paymentMethod: "KB Card", paymentAccount: "•••• 8830", merchant: "Legend Cinema",
+        paymentMethod: "KB Card", paymentAccount: "•••• 8830", merchant: "Angkor DC",
         transactionStatus: "Success", settlementStatus: "Settled", refundStatus: "N/A", transactionDate: "Jul 2, 2026 - 11:45 AM",
         investigationFlag: "None", refreshRequested: "No",
       },
